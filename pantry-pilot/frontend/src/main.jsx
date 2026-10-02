@@ -233,14 +233,19 @@ function RecipeModal({preview, onClose, ...actions}) {
 function GroceryView({selected,onRemove,updateServings,onOpen,busy,grocery,setGrocery,onBuild,loading}) {
   const selection = Object.values(selected)
   const checked = grocery.filter(x=>x.checked).length
+  const sections = Object.entries(grocery.reduce((groups, item, index) => {
+    const category = item.category || 'Other'
+    ;(groups[category] ||= []).push({item, index})
+    return groups
+  }, {}))
   const toggleCheck = i => setGrocery(prev => prev.map((x,idx)=>idx===i?{...x,checked:!x.checked}:x))
   const copyList = async () => {
-    const text = grocery.map(x => `${x.checked?'✓':'☐'} ${[x.quantity_display,x.unit,x.name].filter(Boolean).join(' ')}`).join('\n')
+    const text = sections.map(([category, entries]) => `${category}\n${entries.map(({item}) => `${item.checked?'✓':'☐'} ${[item.quantity_display,item.unit,item.name].filter(Boolean).join(' ')}`).join('\n')}`).join('\n\n')
     await navigator.clipboard.writeText(text)
   }
   return <div className="grocery-layout">
     <aside className="plan-panel"><div className="panel-title"><span>Meal Plan</span><b>{selection.length}</b></div>{selection.length ? selection.map(r=><div className="plan-recipe" key={r.id}><div><button className="plan-title" onClick={()=>onOpen(r)}>{r.title}</button><label>Servings <input type="number" min="0.5" step="0.5" key={r.servings} defaultValue={r.servings} disabled={busy} onBlur={e=>{updateServings(r.id,e.target.value); e.target.value=r.servings}}/></label></div><button disabled={busy} aria-label={`Remove ${r.title} from Meal Plan`} onClick={()=>onRemove(r.id)}><Trash2 size={16}/></button></div>) : <p className="muted">Add recipes from Discover or your Cookbook.</p>}<button className="primary wide" disabled={!selection.length||loading} onClick={onBuild}>{loading?<LoaderCircle className="spin" size={17}/>:<RefreshCw size={17}/>}Rebuild list</button></aside>
-    <section className="list-panel"><div className="list-head"><div><span className="eyebrow">SHOPPING MODE</span><h2>Grocery list</h2><p>{grocery.length ? `${checked} of ${grocery.length} items checked` : 'Build a list from your selected recipes.'}</p></div>{grocery.length>0 && <button className="ghost" onClick={copyList}>Copy list</button>}</div>{loading ? <Loading/> : grocery.length ? <div className="grocery-items">{grocery.map((item,i)=><button key={`${item.name}-${i}`} className={`grocery-item ${item.checked?'checked':''}`} onClick={()=>toggleCheck(i)}><span className="check">{item.checked&&<Check size={15}/>}</span><span className="qty">{[item.quantity_display,item.unit].filter(Boolean).join(' ')}</span><span className="ingredient">{item.name}{item.notes?.length>0&&<small>{item.notes[0]}</small>}</span><span className="sources">{item.sources.length} recipe{item.sources.length===1?'':'s'}</span></button>)}</div> : <Empty icon={<ShoppingBasket/>} title="No grocery list yet" body="Save a recipe to your Grocery List from Discover or your Cookbook."/>}</section>
+    <section className="list-panel"><div className="list-head"><div><span className="eyebrow">SHOPPING MODE</span><h2>Grocery list</h2><p>{grocery.length ? `${checked} of ${grocery.length} items checked` : 'Build a list from your selected recipes.'}</p></div>{grocery.length>0 && <button className="ghost" onClick={copyList}>Copy list</button>}</div>{loading ? <Loading/> : grocery.length ? <div className="grocery-items">{sections.map(([category, entries])=><section className="grocery-section" key={category} aria-label={category}><h3>{category}<span>{entries.length}</span></h3>{entries.map(({item,index})=><button key={`${item.name}-${index}`} className={`grocery-item ${item.checked?'checked':''}`} onClick={()=>toggleCheck(index)}><span className="check">{item.checked&&<Check size={15}/>}</span><span className="qty">{[item.quantity_display,item.unit].filter(Boolean).join(' ')}</span><span className="ingredient">{item.name}{item.notes?.length>0&&<small>{item.notes[0]}</small>}</span><span className="sources">{item.sources.length} recipe{item.sources.length===1?'':'s'}</span></button>)}</section>)}</div> : <Empty icon={<ShoppingBasket/>} title="No grocery list yet" body="Save a recipe to your Grocery List from Discover or your Cookbook."/>}</section>
   </div>
 }
 

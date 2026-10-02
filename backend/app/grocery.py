@@ -13,6 +13,38 @@ UNITS = {
 }
 
 
+# First matching rule wins: specific pantry products precede their fresh names
+# (for example, chicken broth is Pantry, rather than Meat & Seafood).
+GROCERY_CATEGORIES = (
+    "Vegetables", "Fruit", "Dairy & Eggs", "Meat & Seafood",
+    "Bakery & Grains", "Pantry", "Herbs & Spices", "Frozen", "Other",
+)
+CATEGORY_RULES = (
+    ("Frozen", r"frozen|ice cream"),
+    ("Pantry", r"broth|stock|bouillon|canned|cans?|tomato (?:paste|sauce)|coconut (?:milk|cream)|(?:almond|oat|soy) milk|(?:peanut|almond|cashew|sunflower) butter|apple ?sauce|juice|oil|vinegar|sauce|paste|ketchup|mustard|mayonnaise|mayo|dressing|salsa|syrup|honey|sugar|flour|baking (?:powder|soda)|cornstarch|cocoa|chocolate|vanilla|yeast|beans?|lentils?|chickpeas?|chick peas|peas|nuts?|walnuts?|almonds?|peanuts?|pecans?|cashews?|seeds?|raisins?|tofu|tempeh"),
+    ("Herbs & Spices", r"(?:garlic|onion|chili|chilli|curry) powder|(?:black|white|cayenne|ground|crushed red) pepper|pepper flakes|peppercorns?|salt|paprika|cumin|cinnamon|nutmeg|turmeric|seasoning|dried (?:basil|oregano|thyme|rosemary|parsley|dill)|oregano|bay leaves|cloves|allspice|cardamom|coriander"),
+    ("Dairy & Eggs", r"milk|cream|butter|cheese|cheddar|parmesan|mozzarella|feta|ricotta|yogurt|yoghurt|eggs?|buttermilk|ghee|half.and.half"),
+    ("Meat & Seafood", r"chicken|beef|pork|turkey|lamb|veal|duck|bacon|sausage|ham|steak|ground meat|salmon|tuna|shrimp|prawns?|fish|cod|tilapia|crab|lobster|scallops?|mussels?|clams?|anchovies|sardines"),
+    ("Bakery & Grains", r"bread|breadcrumbs|panko|tortillas?|rolls?|buns?|bagels?|pita|rice|pasta|noodles?|spaghetti|macaroni|penne|orzo|fettuccine|linguine|lasagna|couscous|quinoa|oats?|oatmeal|barley|farro|bulgur"),
+    ("Vegetables", r"onions?|shallots?|scallions?|garlic|tomato(?:es)?|potato(?:es)?|carrots?|celery|broccoli|cauliflower|spinach|kale|lettuce|cabbage|peppers?|zucchini|squash|cucumbers?|mushrooms?|asparagus|eggplants?|aubergines?|corn|green beans|green peas|snap peas|snow peas|beets?|radishes|leeks?|brussels sprouts|arugula|jalapeños?|jalapenos?|chiles?|chilies|ginger|cilantro|parsley|basil|thyme|rosemary|dill|mint"),
+    ("Fruit", r"apples?|bananas?|oranges?|lemons?|limes?|avocados?|strawberr(?:y|ies)|blueberr(?:y|ies)|raspberr(?:y|ies)|berr(?:y|ies)|grapes?|pineapples?|mango(?:es)?|peach(?:es)?|pears?|melons?|watermelons?|cherries|coconut"),
+)
+CATEGORY_PATTERNS = [(category, re.compile(r"\b(?:" + pattern + r")\b", re.I))
+                     for category, pattern in CATEGORY_RULES]
+
+
+def ingredient_category(name):
+    # Ignore preparation notes, which can mention unrelated ingredients.
+    name = re.split(r",|\(", name, maxsplit=1)[0]
+    # Fresh green beans and peas belong with produce, unlike dried legumes.
+    if re.search(r"\b(?:green beans|green peas|snap peas|snow peas)\b", name, re.I) and not re.search(r"\b(?:frozen|canned|can)\b", name, re.I):
+        return "Vegetables"
+    for category, pattern in CATEGORY_PATTERNS:
+        if pattern.search(name):
+            return category
+    return "Other"
+
+
 def _number(token):
     token = token.strip()
     if not token:
@@ -85,6 +117,7 @@ def build_grocery_list(recipes, selections):
             display_qty = str(int(qty)) if float(qty).is_integer() else f"{qty:g}"
         out.append({
             "name": item["name"],
+            "category": ingredient_category(item["name"]),
             "quantity": qty,
             "quantity_display": display_qty,
             "unit": item["unit"],
@@ -92,4 +125,4 @@ def build_grocery_list(recipes, selections):
             "notes": item["unmerged"],
             "checked": False,
         })
-    return sorted(out, key=lambda x: x["name"].lower())
+    return sorted(out, key=lambda x: (GROCERY_CATEGORIES.index(x["category"]), x["name"].lower()))

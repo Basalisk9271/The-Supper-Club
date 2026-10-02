@@ -5,3 +5,5 @@
 button.brand{border:0;background:transparent;color:inherit;padding:0;text-align:left}button.brand:focus-visible{outline:2px solid var(--green);outline-offset:6px;border-radius:8px}
 
 @media(min-width:1000px){.recipe-modal{width:min(1080px,calc(100vw - 80px));max-height:92vh}.modal-content{padding:36px}.modal-image{max-height:380px}}
+
+.grocery-section{margin:18px 0 24px}.grocery-section h3{display:flex;align-items:center;gap:10px;font-size:15px;color:var(--green);padding:0 4px 10px;border-bottom:1px solid var(--line)}.grocery-section h3 span{font-size:11px;color:var(--muted);font-weight:400}
