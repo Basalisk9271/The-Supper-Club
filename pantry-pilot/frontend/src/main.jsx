@@ -196,7 +196,7 @@ function RecipeCard(props) {
   const {recipe, selected, onOpen} = props
   return <article className={`recipe-card ${selected ? 'selected' : ''}`}>
     <button className="recipe-open" onClick={onOpen} aria-label={`View recipe: ${recipe.title}`}>
-      <div className="image-wrap">{recipe.image_url ? <img loading="lazy" src={recipe.image_url} alt=""/> : <div className="image-fallback"><Utensils/></div>}<span className="source-pill">Budget Bytes</span></div>
+      <div className="image-wrap">{recipe.image_url ? <img loading="lazy" src={recipe.image_url} alt=""/> : <div className="image-fallback"><Utensils/></div>}<span className="source-pill">{recipe.source || 'Recipe'}</span></div>
       <div className="card-body"><h3>{recipe.title}</h3></div>
     </button>
     <div className="card-body card-footer"><RecipeActions {...props}/></div>
@@ -225,7 +225,7 @@ function RecipeModal({preview, onClose, ...actions}) {
         <h3>Ingredients</h3><ul>{recipe.ingredients?.map((line, i) => <li key={i}>{line}</li>)}</ul>
         <h3>Instructions</h3><ol>{recipe.instructions?.map((line, i) => <li key={i}>{line}</li>)}</ol>
       </>}
-      <a href={recipe.source_url || recipe.url} target="_blank" rel="noreferrer">View on Budget Bytes <ExternalLink size={14}/></a>
+      <a href={recipe.source_url || recipe.url} target="_blank" rel="noreferrer">View Original Page <ExternalLink size={14}/></a>
     </div>
   </dialog>
 }
