@@ -64,6 +64,28 @@ class MealPlanTests(unittest.TestCase):
         self.post('/api/import')
         self.assertEqual(self.client.get('/api/meal-plan').json(), [])
 
+    def test_remove_from_cookbook_preserves_plan_and_can_be_saved_again(self):
+        recipe_id = self.post('/api/import')['id']
+        self.post('/api/meal-plan')
+        self.client.patch(f'/api/meal-plan/{recipe_id}', json={'id': recipe_id, 'servings': 4})
+        for _ in range(2):
+            self.assertEqual(self.client.delete(f'/api/recipes/{recipe_id}').status_code, 200)
+        db.init_db()
+        self.assertEqual(self.client.get('/api/recipes').json(), [])
+        plan = self.client.get('/api/meal-plan').json()
+        self.assertEqual(plan[0]['id'], recipe_id)
+        self.assertEqual(plan[0]['planned_servings'], 4)
+        grocery = self.client.post('/api/grocery-list', json={'recipes': [{'id': recipe_id, 'servings': 4}]}).json()
+        self.assertEqual(grocery['items'][0]['quantity'], 4)
+        self.assertEqual(self.post('/api/import')['id'], recipe_id)
+        self.assertEqual(len(self.client.get('/api/recipes').json()), 1)
+
+    def test_remove_cookbook_only_recipe(self):
+        recipe_id = self.post('/api/import')['id']
+        self.assertEqual(self.client.delete(f'/api/recipes/{recipe_id}').status_code, 200)
+        self.assertEqual(self.client.get('/api/recipes').json(), [])
+        self.assertEqual(self.client.get('/api/meal-plan').json(), [])
+
     def test_invalid_servings_rejected(self):
         recipe_id = self.post('/api/meal-plan')[0]['id']
         for servings in [0, -1, None]:

@@ -148,3 +148,8 @@ def save_meal_plan_recipe(recipe_id, servings):
 def remove_meal_plan_recipe(recipe_id):
     with db() as conn:
         conn.execute("DELETE FROM meal_plan WHERE recipe_id=?", (recipe_id,))
+
+
+def remove_from_cookbook(recipe_id):
+    with db() as conn:
+        conn.execute("UPDATE recipes SET in_cookbook=0 WHERE id=?", (recipe_id,))

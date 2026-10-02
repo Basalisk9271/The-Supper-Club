@@ -76,7 +76,7 @@ function App() {
   const saved = recipe => library.some(r => r.source_url === (recipe.source_url || recipe.url))
   const planned = recipe => Object.values(selected).some(r => r.source_url === (recipe.source_url || recipe.url))
   const cardProps = recipe => ({recipe, saved: saved(recipe), selected: planned(recipe), busy: !!importing,
-    onOpen: () => openRecipe(recipe), onSave: () => importUrl(recipe.source_url || recipe.url), onAdd: () => addToPlan(recipe)})
+    onOpen: () => openRecipe(recipe), onSave: () => importUrl(recipe.source_url || recipe.url), onAdd: () => addToPlan(recipe), onRemove: () => removeFromCookbook(recipe)})
 
 
   const loadLibrary = async (q = '') => setLibrary(await api(`/api/recipes?q=${encodeURIComponent(q)}`))
@@ -117,6 +117,19 @@ function App() {
       await loadLibrary()
       setToast(`Saved ${recipe.title}`)
       setUrl('')
+    } catch (e) { setToast(e.message) }
+    finally { busy.current = false; setImporting('') }
+  }
+
+  const removeFromCookbook = async recipe => {
+    const entry = library.find(r => r.source_url === (recipe.source_url || recipe.url))
+    if (!entry || busy.current) return
+    busy.current = true
+    setImporting(entry.source_url)
+    try {
+      await api(`/api/recipes/${entry.id}`, {method: 'DELETE'})
+      setLibrary(prev => prev.filter(r => r.id !== entry.id))
+      setToast(`Removed ${entry.title} from Cookbook`)
     } catch (e) { setToast(e.message) }
     finally { busy.current = false; setImporting('') }
   }
@@ -172,9 +185,9 @@ function App() {
   </div>
 }
 
-function RecipeActions({saved, selected, busy, onSave, onAdd}) {
+function RecipeActions({saved, selected, busy, onSave, onAdd, onRemove}) {
   return <div className="card-actions recipe-actions">
-    <button disabled={busy || saved} onClick={onSave}><BookOpen size={15}/>{saved ? 'Saved to Cookbook' : 'Save to Cookbook'}</button>
+    <button disabled={busy} onClick={saved ? onRemove : onSave}>{saved ? <Trash2 size={15}/> : <BookOpen size={15}/>} {saved ? 'Remove from Cookbook' : 'Save to Cookbook'}</button>
     <button disabled={busy || selected} onClick={onAdd}><ShoppingBasket size={15}/>{selected ? 'In Grocery List' : 'Save to Grocery List'}</button>
   </div>
 }

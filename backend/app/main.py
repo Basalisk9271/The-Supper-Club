@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, HttpUrl, Field
 
 from .db import (get_recipes, init_db, list_recipes, upsert_recipe, get_recipe_by_url,
-                 get_meal_plan, save_meal_plan_recipe, remove_meal_plan_recipe)
+                 get_meal_plan, save_meal_plan_recipe, remove_meal_plan_recipe, remove_from_cookbook)
 from .grocery import build_grocery_list
 from .scraper import CATEGORY_URLS, browse_budget_bytes, fetch_recipe
 
@@ -118,3 +118,9 @@ def update_meal_plan(recipe_id: int, body: GrocerySelection):
 def delete_meal_plan(recipe_id: int):
     remove_meal_plan_recipe(recipe_id)
     return get_meal_plan()
+
+
+@app.delete("/api/recipes/{recipe_id}")
+def delete_cookbook_recipe(recipe_id: int):
+    remove_from_cookbook(recipe_id)
+    return {"ok": True}
