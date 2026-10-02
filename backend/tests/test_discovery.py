@@ -15,6 +15,9 @@ def card(slug, title, cost=''):
 
 
 class DiscoveryTests(unittest.TestCase):
+    def setUp(self):
+        scraper._browse_category_page.cache_clear()
+
     def discover(self, html):
         client = httpx.Client(transport=httpx.MockTransport(
             lambda request: httpx.Response(200, text=html, request=request)))
@@ -44,6 +47,20 @@ class DiscoveryTests(unittest.TestCase):
     def test_unverifiable_card_skipped(self):
         with patch.object(scraper, '_is_recipe_page', side_effect=httpx.ConnectError('offline')):
             self.assertEqual(self.discover(card('roundup/', 'Dinner Ideas')), [])
+
+    def test_fills_thirty_recipes_across_source_pages_without_duplicates(self):
+        first = ''.join(card(f'recipe-{i}/', f'Recipe {i}', '$2 recipe') for i in range(20))
+        first += '<a rel="nofollow" href="/category/recipes/page/2/">Next Page</a>'
+        second = ''.join(card(f'recipe-{i}/', f'Recipe {i}', '$2 recipe') for i in range(15, 45))
+        client = httpx.Client(transport=httpx.MockTransport(lambda request: httpx.Response(200, text=second if '/page/2/' in request.url.path else first)))
+        with patch.object(scraper, '_client', side_effect=lambda: httpx.Client(transport=client._transport)):
+            one = scraper.browse_budget_bytes()
+            two = scraper.browse_budget_bytes(page=2)
+        self.assertEqual(len(one['items']), 30)
+        self.assertTrue(one['has_more'])
+        self.assertEqual(len(two['items']), 15)
+        self.assertFalse(two['has_more'])
+        self.assertFalse({x['url'] for x in one['items']} & {x['url'] for x in two['items']})
 
     def test_schema_validation_and_cache(self):
         scraper._is_recipe_page.cache_clear()

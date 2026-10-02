@@ -183,14 +183,13 @@ def _is_recipe_page(url):
     return bool(recipe.get("ingredients") and recipe.get("instructions"))
 
 
-def browse_budget_bytes(category="Popular", page=1):
-    base = CATEGORY_URLS.get(category, CATEGORY_URLS["Popular"])
-    url = base if page <= 1 else urljoin(base, f"page/{page}/")
+@lru_cache(maxsize=256)
+def _browse_category_page(url, day):
     with _client() as client:
         r = client.get(url)
         r.raise_for_status()
     soup = BeautifulSoup(r.text, "html.parser")
-    host = urlparse(base).hostname
+    host = "www.budgetbytes.com"
     results, seen = [], set()
 
     # Only consider post cards, never navigation, account or newsletter links.
@@ -230,14 +229,40 @@ def browse_budget_bytes(category="Popular", page=1):
         if image:
             image = urljoin(str(r.url), image)
         results.append({"title": text, "url": href, "image_url": image, "source": "budgetbytes.com"})
-        if len(results) >= 30:
-            break
-    return {"category": category, "page": page, "source_url": str(r.url), "items": results}
+    next_link = soup.select_one('a.next.page-numbers, a[rel="next"]')
+    if next_link is None:
+        current = urlparse(str(r.url))
+        match = re.search(r"/page/(\d+)/?$", current.path)
+        number = int(match.group(1)) if match else 1
+        category_path = current.path[:match.start() + 1] if match else current.path.rstrip("/") + "/"
+        expected = current._replace(path=category_path + f"page/{number + 1}/", query="", fragment="").geturl()
+        next_link = next((a for a in soup.select("a[href]") if urljoin(str(r.url), a["href"]) == expected), None)
+    next_url = urljoin(str(r.url), next_link.get("href", "")) if next_link else None
+    if next_url and (urlparse(next_url).hostname != host or urlparse(next_url).scheme != "https"):
+        next_url = None
+    return results, next_url
+
+
+def browse_budget_bytes(category="Popular", page=1):
+    base = CATEGORY_URLS.get(category, CATEGORY_URLS["Popular"])
+    url = base
+    results, seen, visited = [], set(), set()
+    end = page * SEARCH_PAGE_SIZE
+    while url and url not in visited and len(results) <= end:
+        visited.add(url)
+        items, url = _browse_category_page(url, int(time.time() // 86400))
+        for item in items:
+            if item["url"] not in seen:
+                seen.add(item["url"])
+                results.append(item)
+    return {"category": category, "page": page, "source_url": base,
+            "items": results[end - SEARCH_PAGE_SIZE:end], "has_more": len(results) > end}
+
 
 
 SITEMAP_INDEX = "https://www.budgetbytes.com/sitemap_index.xml"
 SITEMAP_NS = {"s": "http://www.sitemaps.org/schemas/sitemap/0.9"}
-SEARCH_PAGE_SIZE = 12
+SEARCH_PAGE_SIZE = 30
 _catalog_lock = Lock()
 _catalog_urls = ()
 _catalog_expires = 0
@@ -301,17 +326,23 @@ def search_budget_bytes(query, page=1):
     # Exact names first, then the most focused matches, with stable pagination.
     matches.sort(key=lambda url: (len(_search_words(urlparse(url).path)), url))
     start = (page - 1) * SEARCH_PAGE_SIZE
-    candidates = matches[start:start + SEARCH_PAGE_SIZE]
     unavailable = 0
-    results = []
+    results, seen = [], set()
+    end = start + SEARCH_PAGE_SIZE
+    # Count verified recipes, not candidates: roundups must not leave holes.
     with ThreadPoolExecutor(max_workers=4) as pool:
-        futures = [pool.submit(_search_recipe_card, url, int(time.time() // 86400)) for url in candidates]
-        for future in futures:
-            try:
-                card = future.result()
-                if card and not any(item["url"] == card["url"] for item in results):
-                    results.append(card)
-            except (httpx.HTTPError, ValueError, TypeError):
-                unavailable += 1
-    return {"query": query, "page": page, "items": results,
-            "has_more": start + SEARCH_PAGE_SIZE < len(matches), "unavailable_count": unavailable}
+        for offset in range(0, len(matches), 4):
+            futures = [pool.submit(_search_recipe_card, url, int(time.time() // 86400))
+                       for url in matches[offset:offset + 4]]
+            for future in futures:
+                try:
+                    card = future.result()
+                    if card and card["url"] not in seen:
+                        seen.add(card["url"])
+                        results.append(card)
+                except (httpx.HTTPError, ValueError, TypeError):
+                    unavailable += 1
+            if len(results) > end:
+                break
+    return {"query": query, "page": page, "items": results[start:end],
+            "has_more": len(results) > end, "unavailable_count": unavailable}

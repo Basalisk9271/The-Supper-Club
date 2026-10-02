@@ -29,11 +29,24 @@ class SearchTests(unittest.TestCase):
         with patch.object(scraper, '_budget_bytes_catalog', return_value=urls), patch.object(scraper, '_search_recipe_card', side_effect=card), patch.object(scraper, 'SEARCH_PAGE_SIZE', 2):
             first=scraper.search_budget_bytes(' PANCAKES ')
             self.assertEqual(len(first['items']), 2)
-            self.assertTrue(first['has_more'])
+            self.assertFalse(first['has_more'])
             second=scraper.search_budget_bytes('pancake', 2)
             self.assertEqual(second['items'], [])
             self.assertFalse(second['has_more'])
             self.assertEqual(len(scraper.search_budget_bytes('banana pancakes')['items']), 1)
+
+    def test_thirty_verified_recipes_per_page(self):
+        urls = [BASE + f'pancakes-{i:02}/' for i in range(40)]
+        def card(url, day):
+            return None if url.endswith('00/') else {'title': url, 'url': url}
+        with patch.object(scraper, '_budget_bytes_catalog', return_value=urls), patch.object(scraper, '_search_recipe_card', side_effect=card):
+            one = scraper.search_budget_bytes('pancakes')
+            two = scraper.search_budget_bytes('pancakes', 2)
+        self.assertEqual(len(one['items']), 30)
+        self.assertTrue(one['has_more'])
+        self.assertEqual(len(two['items']), 9)
+        self.assertFalse(two['has_more'])
+        self.assertFalse({x['url'] for x in one['items']} & {x['url'] for x in two['items']})
 
     def test_only_structured_recipes_returned_and_cached(self):
         scraper._search_recipe_card.cache_clear()

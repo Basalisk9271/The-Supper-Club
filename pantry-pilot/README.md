@@ -55,7 +55,7 @@ Open http://localhost:5173.
 
 ## Notes on Budget Bytes
 
-This app intentionally does not call Budget Bytes' `/search/*` or `/?s...` routes. Discovery uses public category pages. Search matches recipe names in public post URLs from a sitemap catalog cached for 24 hours, then verifies matching pages contain recipe ingredients and instructions. It does not search full article text. Result pages check up to 12 candidates with at most four concurrent requests; non-recipes are excluded. Verified cards are cached for the day. Please use it for personal/local use and keep request rates conservative.
+This app intentionally does not call Budget Bytes' `/search/*` or `/?s...` routes. Discovery uses public category pages. Search matches recipe names in public post URLs from a sitemap catalog cached for 24 hours, then verifies matching pages contain recipe ingredients and instructions. It does not search full article text. Discover pages show up to 30 verified recipes, filling across source pages or search candidates when needed. Search uses at most four concurrent requests; non-recipes are excluded. Verified cards are cached for the day. Please use it for personal/local use and keep request rates conservative.
 
 ## Natural next steps
 
