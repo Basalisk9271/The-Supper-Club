@@ -8,7 +8,7 @@ from pydantic import BaseModel, HttpUrl, Field
 from .db import (get_recipes, init_db, list_recipes, upsert_recipe, get_recipe_by_url,
                  get_meal_plan, save_meal_plan_recipe, remove_meal_plan_recipe, remove_from_cookbook)
 from .grocery import build_grocery_list
-from .scraper import CATEGORY_URLS, browse_budget_bytes, fetch_recipe
+from .scraper import CATEGORY_URLS, browse_budget_bytes, fetch_recipe, search_budget_bytes
 
 app = FastAPI(title="Pantry Pilot API", version="0.1.0")
 origins = [x.strip() for x in os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",") if x.strip()]
@@ -44,8 +44,10 @@ def categories():
 
 
 @app.get("/api/discover")
-def discover(category: str = "Popular", page: int = Query(1, ge=1, le=20)):
+def discover(category: str = "Popular", page: int = Query(1, ge=1, le=200), q: str = Query("", max_length=120)):
     try:
+        if q.strip():
+            return search_budget_bytes(q, page)
         return browse_budget_bytes(category, page)
     except Exception as exc:
         raise HTTPException(502, f"Could not load Budget Bytes: {exc}") from exc

@@ -4,7 +4,8 @@ A local-first recipe browser, recipe library, and grocery-list builder focused o
 
 ## What it does
 
-- Browse public Budget Bytes category pages without using the site's disallowed search routes.
+- Browse Budget Bytes categories, or search recipe names across its public sitemap catalog.
+- Submit Discover searches with Search or Enter; results span all categories and support pagination.
 - Preview a recipe from a card or its public URL in a closable modal.
 - Save favorites to your Cookbook independently of your Meal Plan.
 - Add any recipe directly to the Grocery List; its Meal Plan membership and servings persist across reloads.
@@ -54,7 +55,7 @@ Open http://localhost:5173.
 
 ## Notes on Budget Bytes
 
-This app intentionally does not call Budget Bytes' `/search/*` or `/?s...` routes. Discovery uses normal public category pages and recipe ingestion happens only when you request a recipe. Please use it for personal/local use and keep request rates conservative.
+This app intentionally does not call Budget Bytes' `/search/*` or `/?s...` routes. Discovery uses public category pages. Search matches recipe names in public post URLs from a sitemap catalog cached for 24 hours, then verifies matching pages contain recipe ingredients and instructions. It does not search full article text. Result pages check up to 12 candidates with at most four concurrent requests; non-recipes are excluded. Verified cards are cached for the day. Please use it for personal/local use and keep request rates conservative.
 
 ## Natural next steps
 

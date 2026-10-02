@@ -1,8 +1,13 @@
 import json
 import re
+import time
+import unicodedata
+from concurrent.futures import ThreadPoolExecutor
+from threading import Lock
+from xml.etree import ElementTree
 from functools import lru_cache
 from html import unescape
-from urllib.parse import urljoin, urlparse
+from urllib.parse import unquote, urljoin, urlparse
 
 import httpx
 from bs4 import BeautifulSoup
@@ -228,3 +233,85 @@ def browse_budget_bytes(category="Popular", page=1):
         if len(results) >= 30:
             break
     return {"category": category, "page": page, "source_url": str(r.url), "items": results}
+
+
+SITEMAP_INDEX = "https://www.budgetbytes.com/sitemap_index.xml"
+SITEMAP_NS = {"s": "http://www.sitemaps.org/schemas/sitemap/0.9"}
+SEARCH_PAGE_SIZE = 12
+_catalog_lock = Lock()
+_catalog_urls = ()
+_catalog_expires = 0
+
+
+def _budget_bytes_catalog():
+    """Refresh public post URLs once daily; do not crawl every recipe."""
+    global _catalog_urls, _catalog_expires
+    with _catalog_lock:
+        if _catalog_urls and time.monotonic() < _catalog_expires:
+            return _catalog_urls
+        urls = set()
+        with _client() as client:
+            response = client.get(SITEMAP_INDEX)
+            response.raise_for_status()
+            index = ElementTree.fromstring(response.text)
+            for loc in index.findall("s:sitemap/s:loc", SITEMAP_NS):
+                sitemap = urlparse(loc.text or "")
+                if sitemap.scheme != "https" or sitemap.hostname != "www.budgetbytes.com":
+                    continue
+                if not re.fullmatch(r"/post-sitemap[0-9]*\.xml", sitemap.path):
+                    continue
+                response = client.get(loc.text)
+                response.raise_for_status()
+                document = ElementTree.fromstring(response.text)
+                for entry in document.findall("s:url/s:loc", SITEMAP_NS):
+                    url = urlparse(entry.text or "")
+                    if url.scheme == "https" and url.hostname == "www.budgetbytes.com" and url.path.strip("/"):
+                        if not any(part in url.path for part in EXCLUDE_PATH_PARTS):
+                            urls.add(url._replace(query="", fragment="").geturl())
+        if not urls:
+            raise ValueError("Budget Bytes recipe catalog is unavailable. Please try again.")
+        _catalog_urls = tuple(sorted(urls))
+        _catalog_expires = time.monotonic() + 86400
+        return _catalog_urls
+
+
+def _search_words(text):
+    text = unicodedata.normalize("NFKD", unquote(text)).encode("ascii", "ignore").decode().lower()
+    # Treat common singular/plural recipe names alike (pancake/pancakes).
+    return {word[:-1] if len(word) > 3 and word.endswith("s") and not word.endswith("ss") else word
+            for word in re.findall(r"[a-z0-9]+", text)}
+
+
+@lru_cache(maxsize=512)
+def _search_recipe_card(url, day):
+    recipe = fetch_recipe(url)
+    if not recipe.get("ingredients") or not recipe.get("instructions"):
+        return None
+    return {"title": recipe["title"], "url": recipe["source_url"],
+            "image_url": recipe.get("image_url"), "source": recipe["source"]}
+
+
+def search_budget_bytes(query, page=1):
+    query = query.strip()
+    words = _search_words(query)
+    if not words:
+        return {"query": query, "page": page, "items": [], "has_more": False, "unavailable_count": 0}
+    matches = [url for url in _budget_bytes_catalog()
+               if words <= _search_words(urlparse(url).path)]
+    # Exact names first, then the most focused matches, with stable pagination.
+    matches.sort(key=lambda url: (len(_search_words(urlparse(url).path)), url))
+    start = (page - 1) * SEARCH_PAGE_SIZE
+    candidates = matches[start:start + SEARCH_PAGE_SIZE]
+    unavailable = 0
+    results = []
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        futures = [pool.submit(_search_recipe_card, url, int(time.time() // 86400)) for url in candidates]
+        for future in futures:
+            try:
+                card = future.result()
+                if card and not any(item["url"] == card["url"] for item in results):
+                    results.append(card)
+            except (httpx.HTTPError, ValueError, TypeError):
+                unavailable += 1
+    return {"query": query, "page": page, "items": results,
+            "has_more": start + SEARCH_PAGE_SIZE < len(matches), "unavailable_count": unavailable}

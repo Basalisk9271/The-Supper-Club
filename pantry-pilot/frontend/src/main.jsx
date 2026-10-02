@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useRef } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { createRoot } from 'react-dom/client'
 import {
   BookOpen, ChefHat, ExternalLink, LoaderCircle, Plus, Search, ShoppingBasket,
@@ -34,6 +34,12 @@ function App() {
   const [discoverPage, setDiscoverPage] = useState(1)
   const [library, setLibrary] = useState([])
   const [search, setSearch] = useState('')
+  const [discoverInput, setDiscoverInput] = useState('')
+  const [discoverQuery, setDiscoverQuery] = useState('')
+  const [discoverRefresh, setDiscoverRefresh] = useState(0)
+  const [hasMore, setHasMore] = useState(true)
+  const [discoverError, setDiscoverError] = useState('')
+  const [unavailableCount, setUnavailableCount] = useState(0)
   const [loading, setLoading] = useState(false)
   const [importing, setImporting] = useState('')
   const [url, setUrl] = useState('')
@@ -80,20 +86,30 @@ function App() {
 
 
   const loadLibrary = async (q = '') => setLibrary(await api(`/api/recipes?q=${encodeURIComponent(q)}`))
-  const loadDiscover = async (cat = category, page = discoverPage) => {
+  useEffect(() => {
+    const controller = new AbortController()
     setLoading(true)
-    try {
-      const data = await api(`/api/discover?category=${encodeURIComponent(cat)}&page=${page}`)
-      setDiscover(data.items || [])
-    } catch (e) { setToast(e.message) }
-    finally { setLoading(false) }
-  }
+    setDiscover([])
+    setDiscoverError('')
+    setUnavailableCount(0)
+    api(`/api/discover?category=${encodeURIComponent(category)}&page=${discoverPage}&q=${encodeURIComponent(discoverQuery)}`, {signal: controller.signal})
+      .then(data => {
+        if (controller.signal.aborted) return
+        setDiscover(data.items || [])
+        setHasMore(data.has_more ?? (data.items?.length > 0))
+        setUnavailableCount(data.unavailable_count || 0)
+      })
+      .catch(e => { if (!controller.signal.aborted) setDiscoverError(e.message) })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false) })
+    return () => controller.abort()
+  }, [category, discoverPage, discoverQuery, discoverRefresh])
+
+  const clearDiscoverSearch = () => {setDiscoverInput('');setDiscoverQuery('');setDiscoverPage(1)}
 
   useEffect(() => {
     api('/api/categories').then(setCategories).catch(() => setCategories(['Popular','Quick','One Pot','Chicken','Vegetarian']))
     api('/api/meal-plan').then(applyPlan).catch(e => setToast(e.message))
     loadLibrary().catch(e => setToast(e.message))
-    loadDiscover().catch(e => setToast(e.message))
   }, [])
 
   useEffect(() => {
@@ -137,15 +153,9 @@ function App() {
   const buildList = () => { setListVersion(v => v + 1); setTab('grocery') }
 
   const selectedCount = Object.keys(selected).length
-  const filteredDiscover = useMemo(() => {
-    if (!search.trim()) return discover
-    const q = search.toLowerCase()
-    return discover.filter(x => x.title.toLowerCase().includes(q))
-  }, [discover, search])
-
   return <div className="app-shell">
     <header>
-      <button className="brand" aria-label="Pantry Pilot — Discover" onClick={()=>{setTab('discover');setSearch('')}}><div className="logo"><ChefHat size={23}/></div><div><strong>Pantry Pilot</strong><span>recipes → groceries</span></div></button>
+      <button className="brand" aria-label="Pantry Pilot — Discover" onClick={()=>{setTab('discover');setSearch('');clearDiscoverSearch()}}><div className="logo"><ChefHat size={23}/></div><div><strong>Pantry Pilot</strong><span>recipes → groceries</span></div></button>
       <nav>
         <button className={tab==='discover'?'active':''} onClick={()=>setTab('discover')}><Sparkles size={17}/>Discover</button>
         <button className={tab==='library'?'active':''} onClick={()=>setTab('library')}><BookOpen size={17}/>Cookbook <b>{library.length}</b></button>
@@ -160,17 +170,19 @@ function App() {
       </section>
 
       {tab !== 'grocery' && <div className="toolbar">
-        <div className="search"><Search size={18}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder={tab==='discover'?'Filter the recipes on this page…':'Search your saved recipes…'}/>{search && <button onClick={()=>setSearch('')}><X size={16}/></button>}</div>
+        <form className="search" onSubmit={e=>{e.preventDefault();if(tab==='discover'){setDiscoverQuery(discoverInput.trim());setDiscoverPage(1);setDiscoverRefresh(v=>v+1)}}}><Search size={18}/><input aria-label={tab==='discover'?'Search Budget Bytes recipes':'Search Cookbook'} maxLength={120} value={tab==='discover'?discoverInput:search} onChange={e=>tab==='discover'?setDiscoverInput(e.target.value):setSearch(e.target.value)} placeholder={tab==='discover'?'Search Budget Bytes recipe names…':'Search your saved recipes…'}/>{(tab==='discover'?discoverInput || discoverQuery:search) && <button type="button" aria-label="Clear search" onClick={()=>tab==='discover'?clearDiscoverSearch():setSearch('')}><X size={16}/></button>}{tab==='discover' && <button className="search-submit" type="submit">Search</button>}</form>
         <div className="url-import"><input value={url} onChange={e=>setUrl(e.target.value)} placeholder="Paste a recipe URL…"/><button disabled={!url || importing} onClick={()=>openRecipe({url, title: 'Recipe preview'})}>{importing===url?<LoaderCircle className="spin" size={17}/>:<Plus size={17}/>}Preview</button></div>
       </div>}
 
       {tab === 'discover' && <>
         <div className="category-row">
-          <div className="chips">{categories.map(c => <button key={c} className={category===c?'chip active':'chip'} onClick={()=>{setCategory(c);setDiscoverPage(1);loadDiscover(c,1)}}>{c}</button>)}</div>
-          <button className="ghost" onClick={()=>loadDiscover()}><RefreshCw size={16}/>Refresh</button>
+          <div className="chips">{categories.map(c => <button key={c} className={category===c?'chip active':'chip'} onClick={()=>{setCategory(c);setDiscoverPage(1);clearDiscoverSearch()}}>{c}</button>)}</div>
+          <button className="ghost" onClick={()=>setDiscoverRefresh(v=>v+1)}><RefreshCw size={16}/>Refresh</button>
         </div>
-        {loading ? <Loading/> : <div className="card-grid">{filteredDiscover.map((r,i)=><RecipeCard key={`${r.url}-${i}`} {...cardProps(r)}/>)}</div>}
-        <div className="pager"><button disabled={discoverPage<=1} onClick={()=>{const p=discoverPage-1;setDiscoverPage(p);loadDiscover(category,p)}}>Previous</button><span>Page {discoverPage}</span><button onClick={()=>{const p=discoverPage+1;setDiscoverPage(p);loadDiscover(category,p)}}>Next</button></div>
+        {discoverQuery && <p className="muted">Budget Bytes recipe results for “{discoverQuery}” — all categories</p>}
+        {unavailableCount > 0 && <p role="status" className="muted">Some recipes could not be checked. Refresh to try again.</p>}
+        {loading ? <Loading/> : discoverError ? <p role="alert">{discoverError}</p> : !discover.length ? <Empty icon={<Search/>} title="No recipes found on this page" body={hasMore?'Try the next page for more matches.':'Try another recipe name.'}/> : <div className="card-grid">{discover.map((r,i)=><RecipeCard key={`${r.url}-${i}`} {...cardProps(r)}/>)}</div>}
+        <div className="pager"><button disabled={loading || discoverPage<=1} onClick={()=>{const p=discoverPage-1;setDiscoverPage(p)}}>Previous</button><span>Page {discoverPage}</span><button disabled={loading || !hasMore || discoverPage>=200} onClick={()=>{const p=discoverPage+1;setDiscoverPage(p)}}>Next</button></div>
       </>}
 
       {tab === 'library' && <>
