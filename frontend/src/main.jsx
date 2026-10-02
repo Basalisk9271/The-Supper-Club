@@ -145,7 +145,7 @@ function App() {
 
   return <div className="app-shell">
     <header>
-      <div className="brand"><div className="logo"><ChefHat size={23}/></div><div><strong>Pantry Pilot</strong><span>recipes → groceries</span></div></div>
+      <button className="brand" aria-label="Pantry Pilot — Discover" onClick={()=>{setTab('discover');setSearch('')}}><div className="logo"><ChefHat size={23}/></div><div><strong>Pantry Pilot</strong><span>recipes → groceries</span></div></button>
       <nav>
         <button className={tab==='discover'?'active':''} onClick={()=>setTab('discover')}><Sparkles size={17}/>Discover</button>
         <button className={tab==='library'?'active':''} onClick={()=>setTab('library')}><BookOpen size={17}/>Cookbook <b>{library.length}</b></button>
