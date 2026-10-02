@@ -1,5 +1,6 @@
 import json
 import re
+from functools import lru_cache
 from html import unescape
 from urllib.parse import urljoin, urlparse
 
@@ -170,6 +171,13 @@ def fetch_recipe(url):
     return result
 
 
+@lru_cache(maxsize=256)
+def _is_recipe_page(url):
+    """Cache successful checks so browsing does not repeatedly fetch roundups."""
+    recipe = fetch_recipe(url)
+    return bool(recipe.get("ingredients") and recipe.get("instructions"))
+
+
 def browse_budget_bytes(category="Popular", page=1):
     base = CATEGORY_URLS.get(category, CATEGORY_URLS["Popular"])
     url = base if page <= 1 else urljoin(base, f"page/{page}/")
@@ -180,34 +188,43 @@ def browse_budget_bytes(category="Popular", page=1):
     host = urlparse(base).hostname
     results, seen = [], set()
 
-    # Prefer links that have an image/title nearby. This avoids depending on fragile CSS class names.
-    for a in soup.find_all("a", href=True):
-        href = urljoin(str(r.url), a["href"])
-        p = urlparse(href)
-        if p.hostname != host or href in seen:
+    # Only consider post cards, never navigation, account or newsletter links.
+    for card in soup.select("article.post-summary"):
+        title = card.select_one(".post-summary__title")
+        a = title.find_parent("a", href=True) if title else None
+        if a is None and title is not None:
+            a = title.find("a", href=True)
+        if a is None:
+            continue
+        p = urlparse(urljoin(str(r.url), a["href"]))
+        href = p._replace(query="", fragment="").geturl()
+        if p.scheme not in ("http", "https") or p.hostname != host or href in seen:
             continue
         if any(part in p.path for part in EXCLUDE_PATH_PARTS):
             continue
-        if p.path in ("/", "") or p.path.count("/") < 2:
+        if p.path in ("/", ""):
             continue
+        seen.add(href)
 
-        text = a.get_text(" ", strip=True)
-        img = a.find("img")
-        if not text and img:
-            text = img.get("alt", "").strip()
+        # Budget Bytes gives individual recipes a cost badge. Roundups share
+        # the same card markup but lack this badge. Some genuine recipes also
+        # omit it, so confirm those using their structured Recipe data.
+        cost = card.select_one(".cost-per")
+        if not (cost and re.search(r"\$\d", cost.get_text())):
+            try:
+                if not _is_recipe_page(href):
+                    continue
+            except httpx.HTTPError:
+                # A failed check must not turn an unverified page into a recipe.
+                continue
+        text = title.get_text(" ", strip=True)
         if not text:
             continue
-        # Strip price fragments from card text while keeping recipe title.
-        text = re.split(r"\$\d", text, maxsplit=1)[0].strip()
-        if len(text) < 4 or len(text) > 120:
-            continue
-        image = None
-        if img:
-            image = img.get("data-src") or img.get("src")
-            if image:
-                image = urljoin(str(r.url), image)
+        img = a.find("img")
+        image = (img.get("data-src") or img.get("src")) if img else None
+        if image:
+            image = urljoin(str(r.url), image)
         results.append({"title": text, "url": href, "image_url": image, "source": "budgetbytes.com"})
-        seen.add(href)
         if len(results) >= 30:
             break
     return {"category": category, "page": page, "source_url": str(r.url), "items": results}
