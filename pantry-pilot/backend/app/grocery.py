@@ -90,6 +90,32 @@ def parse_ingredient(line):
     return {"quantity": qty, "unit": unit, "name": name, "key": key, "original": line}
 
 
+POUND_UNITS = {"lb", "lbs", "pound", "pounds"}
+OUNCE_UNITS = {"oz", "ounce", "ounces"}
+PASTA_NAMES = re.compile(
+    r"\b(?:pasta|noodles?|spaghetti|macaroni|penne|orzo|fettuccine|linguine|"
+    r"lasagna|lasagne|rigatoni|rotini|fusilli|farfalle|ravioli|tortellini|"
+    r"ziti|vermicelli|angel hair)\b", re.I
+)
+
+
+def shopping_weight(ingredient):
+    """Use package-friendly weight units before merging grocery amounts."""
+    unit = ingredient["unit"]
+    quantity = ingredient["quantity"]
+    if unit in OUNCE_UNITS:
+        unit = "oz"
+    elif unit in POUND_UNITS:
+        unit = "lb"
+        category = ingredient_category(ingredient["key"])
+        dairy = category == "Dairy & Eggs" and not re.search(r"\beggs?\b", ingredient["key"])
+        pasta = PASTA_NAMES.search(ingredient["key"]) and category not in {"Pantry", "Meat & Seafood"}
+        if quantity is not None and (dairy or pasta):
+            quantity *= 16
+            unit = "oz"
+    return {**ingredient, "quantity": quantity, "unit": unit}
+
+
 def build_grocery_list(recipes, selections):
     grouped = defaultdict(lambda: {"quantity": 0.0, "unit": None, "name": None, "sources": [], "unmerged": []})
     for recipe in recipes:
@@ -98,7 +124,7 @@ def build_grocery_list(recipes, selections):
         base_servings = float(recipe.get("servings") or target_servings or 1)
         multiplier = target_servings / base_servings if base_servings else 1
         for line in recipe.get("ingredients", []):
-            parsed = parse_ingredient(line)
+            parsed = shopping_weight(parse_ingredient(line))
             group_key = f"{parsed['key']}|{parsed['unit'] or ''}"
             item = grouped[group_key]
             item["name"] = parsed["name"]
