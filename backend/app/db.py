@@ -53,6 +53,11 @@ def init_db():
             """
         )
 
+        columns = {row["name"] for row in conn.execute("PRAGMA table_info(recipes)")}
+        if "in_cookbook" not in columns:
+            conn.execute("ALTER TABLE recipes ADD COLUMN in_cookbook INTEGER NOT NULL DEFAULT 1")
+        conn.execute("CREATE TABLE IF NOT EXISTS meal_plan (recipe_id INTEGER PRIMARY KEY REFERENCES recipes(id), servings REAL NOT NULL)")
+
 
 def row_to_recipe(row):
     if not row:
@@ -64,15 +69,15 @@ def row_to_recipe(row):
     return item
 
 
-def upsert_recipe(recipe):
+def upsert_recipe(recipe, save_to_cookbook=True):
     with db() as conn:
         conn.execute(
             """
             INSERT INTO recipes (
                 source, source_url, title, description, image_url, author, servings,
                 prep_minutes, cook_minutes, total_minutes, cost_text,
-                ingredients_json, instructions_json, tags_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ingredients_json, instructions_json, tags_json, in_cookbook
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(source_url) DO UPDATE SET
                 title=excluded.title,
                 description=excluded.description,
@@ -85,7 +90,8 @@ def upsert_recipe(recipe):
                 cost_text=excluded.cost_text,
                 ingredients_json=excluded.ingredients_json,
                 instructions_json=excluded.instructions_json,
-                tags_json=excluded.tags_json
+                tags_json=excluded.tags_json,
+                in_cookbook=MAX(recipes.in_cookbook, excluded.in_cookbook)
             """,
             (
                 recipe["source"], recipe["source_url"], recipe["title"],
@@ -94,7 +100,7 @@ def upsert_recipe(recipe):
                 recipe.get("total_minutes"), recipe.get("cost_text"),
                 json.dumps(recipe.get("ingredients", [])),
                 json.dumps(recipe.get("instructions", [])),
-                json.dumps(recipe.get("tags", [])),
+                json.dumps(recipe.get("tags", [])), int(save_to_cookbook),
             ),
         )
         row = conn.execute("SELECT * FROM recipes WHERE source_url=?", (recipe["source_url"],)).fetchone()
@@ -106,11 +112,11 @@ def list_recipes(search=""):
         if search.strip():
             q = f"%{search.strip()}%"
             rows = conn.execute(
-                "SELECT * FROM recipes WHERE title LIKE ? OR description LIKE ? ORDER BY imported_at DESC",
+                "SELECT * FROM recipes WHERE in_cookbook=1 AND (title LIKE ? OR description LIKE ?) ORDER BY imported_at DESC",
                 (q, q),
             ).fetchall()
         else:
-            rows = conn.execute("SELECT * FROM recipes ORDER BY imported_at DESC").fetchall()
+            rows = conn.execute("SELECT * FROM recipes WHERE in_cookbook=1 ORDER BY imported_at DESC").fetchall()
         return [row_to_recipe(r) for r in rows]
 
 
@@ -121,3 +127,24 @@ def get_recipes(ids):
     with db() as conn:
         rows = conn.execute(f"SELECT * FROM recipes WHERE id IN ({marks})", ids).fetchall()
         return [row_to_recipe(r) for r in rows]
+
+
+def get_recipe_by_url(url):
+    with db() as conn:
+        return row_to_recipe(conn.execute("SELECT * FROM recipes WHERE source_url=?", (url,)).fetchone())
+
+
+def get_meal_plan():
+    with db() as conn:
+        rows = conn.execute("SELECT recipes.*, meal_plan.servings AS planned_servings FROM meal_plan JOIN recipes ON recipes.id=meal_plan.recipe_id ORDER BY recipe_id").fetchall()
+        return [row_to_recipe(row) for row in rows]
+
+
+def save_meal_plan_recipe(recipe_id, servings):
+    with db() as conn:
+        conn.execute("INSERT INTO meal_plan (recipe_id, servings) VALUES (?, ?) ON CONFLICT(recipe_id) DO UPDATE SET servings=excluded.servings", (recipe_id, servings))
+
+
+def remove_meal_plan_recipe(recipe_id):
+    with db() as conn:
+        conn.execute("DELETE FROM meal_plan WHERE recipe_id=?", (recipe_id,))

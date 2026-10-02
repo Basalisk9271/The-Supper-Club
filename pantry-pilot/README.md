@@ -5,10 +5,12 @@ A local-first recipe browser, recipe library, and grocery-list builder focused o
 ## What it does
 
 - Browse public Budget Bytes category pages without using the site's disallowed search routes.
-- Import a recipe from its public URL.
+- Preview a recipe from a card or its public URL in a closable modal.
+- Save favorites to your Cookbook independently of your Meal Plan.
+- Add any recipe directly to the Grocery List; its Meal Plan membership and servings persist across reloads.
 - Parse standard Recipe JSON-LD when available, with HTML fallbacks.
 - Cache imported recipes in SQLite for instant local search.
-- Select recipes and scale servings.
+- Change Meal Plan servings or remove meals to automatically update the Grocery List.
 - Build a combined grocery list with lightweight ingredient normalization.
 - Keeps the backend source-adapter pattern ready for additional recipe sites and meal planning.
 

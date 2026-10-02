@@ -3,9 +3,10 @@ from typing import Dict, List
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, HttpUrl, Field
 
-from .db import get_recipes, init_db, list_recipes, upsert_recipe
+from .db import (get_recipes, init_db, list_recipes, upsert_recipe, get_recipe_by_url,
+                 get_meal_plan, save_meal_plan_recipe, remove_meal_plan_recipe)
 from .grocery import build_grocery_list
 from .scraper import CATEGORY_URLS, browse_budget_bytes, fetch_recipe
 
@@ -20,7 +21,7 @@ class ImportBody(BaseModel):
 
 class GrocerySelection(BaseModel):
     id: int
-    servings: float | None = None
+    servings: float | None = Field(default=None, gt=0, allow_inf_nan=False)
 
 
 class GroceryBody(BaseModel):
@@ -50,17 +51,16 @@ def discover(category: str = "Popular", page: int = Query(1, ge=1, le=20)):
         raise HTTPException(502, f"Could not load Budget Bytes: {exc}") from exc
 
 
-@app.post("/api/import")
-def import_recipe(body: ImportBody):
+def resolve_recipe(body: ImportBody):
     url = str(body.url)
-    if "budgetbytes.com" not in url:
-        # Parser is deliberately generic, but this warning-free path lets us expand later.
-        pass
+    cached = get_recipe_by_url(url)
+    if cached:
+        return cached
     try:
         recipe = fetch_recipe(url)
         if not recipe.get("ingredients"):
             raise HTTPException(422, "The page loaded, but no structured recipe ingredients were found.")
-        return upsert_recipe(recipe)
+        return recipe
     except HTTPException:
         raise
     except Exception as exc:
@@ -78,3 +78,43 @@ def grocery_list(body: GroceryBody):
     recipes = get_recipes(ids)
     selections: Dict[str, dict] = {str(x.id): {"servings": x.servings} for x in body.recipes}
     return {"items": build_grocery_list(recipes, selections), "recipe_count": len(recipes)}
+
+
+@app.post("/api/preview")
+def preview_recipe(body: ImportBody):
+    return resolve_recipe(body)
+
+
+@app.post("/api/import")
+def import_recipe(body: ImportBody):
+    return upsert_recipe(resolve_recipe(body), save_to_cookbook=True)
+
+
+@app.get("/api/meal-plan")
+def meal_plan():
+    return get_meal_plan()
+
+
+@app.post("/api/meal-plan")
+def add_to_meal_plan(body: ImportBody):
+    recipe = upsert_recipe(resolve_recipe(body), save_to_cookbook=False)
+    existing = next((r for r in get_meal_plan() if r["id"] == recipe["id"]), None)
+    if not existing:
+        save_meal_plan_recipe(recipe["id"], recipe.get("servings") or 1)
+    return get_meal_plan()
+
+
+@app.patch("/api/meal-plan/{recipe_id}")
+def update_meal_plan(recipe_id: int, body: GrocerySelection):
+    if body.id != recipe_id or not any(r["id"] == recipe_id for r in get_meal_plan()):
+        raise HTTPException(404, "Meal plan recipe not found")
+    if body.servings is None:
+        raise HTTPException(422, "Servings are required")
+    save_meal_plan_recipe(recipe_id, body.servings)
+    return get_meal_plan()
+
+
+@app.delete("/api/meal-plan/{recipe_id}")
+def delete_meal_plan(recipe_id: int):
+    remove_meal_plan_recipe(recipe_id)
+    return get_meal_plan()
