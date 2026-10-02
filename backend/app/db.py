@@ -4,7 +4,8 @@ import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
 
-DB_PATH = os.getenv("PANTRY_DB", str(Path(__file__).resolve().parents[2] / "pantry.db"))
+# Keep the previous setting and filename as fallbacks for existing installations.
+DB_PATH = os.getenv("SUPPER_CLUB_DB") or os.getenv("PANTRY_DB", str(Path(__file__).resolve().parents[2] / "pantry.db"))
 
 
 def _connect():

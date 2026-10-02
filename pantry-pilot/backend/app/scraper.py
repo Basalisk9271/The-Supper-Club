@@ -12,7 +12,7 @@ from urllib.parse import unquote, urljoin, urlparse
 import httpx
 from bs4 import BeautifulSoup
 
-UA = "PantryPilot/0.1 (personal recipe organizer; respectful on-demand fetches)"
+UA = "TheSupperClub/0.1 (personal recipe organizer; respectful on-demand fetches)"
 TIMEOUT = 20.0
 
 CATEGORY_URLS = {

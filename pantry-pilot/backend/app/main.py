@@ -10,7 +10,7 @@ from .db import (get_recipes, init_db, list_recipes, upsert_recipe, get_recipe_b
 from .grocery import build_grocery_list
 from .scraper import CATEGORY_URLS, browse_budget_bytes, fetch_recipe, search_budget_bytes
 
-app = FastAPI(title="Pantry Pilot API", version="0.1.0")
+app = FastAPI(title="The Supper Club API", description="Discover recipes, save a personal Cookbook, plan meals, and build a grocery list.", version="0.1.0")
 origins = [x.strip() for x in os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",") if x.strip()]
 app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 

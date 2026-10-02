@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react'
 import { createRoot } from 'react-dom/client'
 import {
-  BookOpen, ChefHat, ExternalLink, LoaderCircle, Plus, Search, ShoppingBasket,
+  BookOpen, ExternalLink, LoaderCircle, Plus, Search, ShoppingBasket,
   Sparkles, Trash2, Utensils, X, Check, RefreshCw
 } from 'lucide-react'
 import './styles.css'
@@ -156,7 +156,7 @@ function App() {
   const selectedCount = Object.keys(selected).length
   return <div className="app-shell">
     <header>
-      <button className="brand" aria-label="Pantry Pilot — Discover" onClick={()=>{setTab('discover');setSearch('');clearDiscoverSearch()}}><div className="logo"><ChefHat size={23}/></div><div><strong>Pantry Pilot</strong><span>recipes → groceries</span></div></button>
+      <button className="brand" aria-label="The Supper Club — Discover" onClick={()=>{setTab('discover');setSearch('');clearDiscoverSearch()}}><div className="logo"><Utensils size={23}/></div><div><strong>The Supper Club</strong><span>Good food. Shared plans.</span></div></button>
       <nav>
         <button className={tab==='discover'?'active':''} onClick={()=>setTab('discover')}><Sparkles size={17}/>Discover</button>
         <button className={tab==='library'?'active':''} onClick={()=>setTab('library')}><BookOpen size={17}/>Cookbook <b>{library.length}</b></button>
@@ -166,13 +166,13 @@ function App() {
 
     <main>
       <section className="hero">
-        <div><div className="eyebrow">LOCAL-FIRST MEAL TOOL</div><h1>What sounds good?</h1><p>Browse Budget Bytes, save what you like, and turn recipes into one clean grocery list.</p></div>
+        <div><div className="eyebrow">YOUR TABLE, SORTED</div><h1>Something good for supper.</h1><p>Find your next favorite, plan your meals, and bring one good list to the store.</p></div>
         <div className="stats"><div><b>{library.length}</b><span>saved recipes</span></div><div><b>{selectedCount}</b><span>in your Meal Plan</span></div></div>
       </section>
 
       {tab !== 'grocery' && <div className="toolbar">
         <form className="search" onSubmit={e=>{e.preventDefault();if(tab==='discover'){setDiscoverQuery(discoverInput.trim());setDiscoverPage(1);setDiscoverRefresh(v=>v+1)}}}><Search size={18}/><input aria-label={tab==='discover'?'Search Budget Bytes recipes':'Search Cookbook'} maxLength={120} value={tab==='discover'?discoverInput:search} onChange={e=>tab==='discover'?setDiscoverInput(e.target.value):setSearch(e.target.value)} placeholder={tab==='discover'?'Search Budget Bytes recipe names…':'Search your saved recipes…'}/>{(tab==='discover'?discoverInput || discoverQuery:search) && <button type="button" aria-label="Clear search" onClick={()=>tab==='discover'?clearDiscoverSearch():setSearch('')}><X size={16}/></button>}{tab==='discover' && <button className="search-submit" type="submit">Search</button>}</form>
-        <div className="url-import"><input value={url} onChange={e=>setUrl(e.target.value)} placeholder="Paste a recipe URL…"/><button disabled={!url || importing} onClick={()=>openRecipe({url, title: 'Recipe preview'})}>{importing===url?<LoaderCircle className="spin" size={17}/>:<Plus size={17}/>}Preview</button></div>
+        <div className="url-import"><input value={url} onChange={e=>setUrl(e.target.value)} placeholder="Paste a recipe URL…"/><button disabled={!url || importing} onClick={()=>openRecipe({url, title: 'Recipe preview'})}>{importing && importing===url?<LoaderCircle className="spin" size={17}/>:<Plus size={17}/>}Preview</button></div>
       </div>}
 
       {tab === 'discover' && <>
