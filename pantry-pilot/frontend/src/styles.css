@@ -13,3 +13,5 @@ button.brand{border:0;background:transparent;color:inherit;padding:0;text-align:
 @media(min-width:501px) and (max-width:600px){.card-grid{grid-template-columns:1fr}}
 
 .search{min-width:0}header nav{min-width:0}header .brand{flex-shrink:0}@media(max-width:760px){header{gap:12px}.toolbar{grid-template-columns:minmax(0,1fr)}}
+
+.copy-status{font-size:13px;color:var(--green);margin-bottom:12px}.copy-status:empty{display:none}.manual-copy{margin:12px 0 20px}.manual-copy label{display:block;font-size:13px;margin-bottom:8px}.manual-copy textarea{width:100%;min-height:180px;background:var(--panel2);color:var(--cream);border:1px solid var(--line);border-radius:10px;padding:12px;font:inherit;font-size:13px;resize:vertical}.manual-copy button{margin-top:8px}

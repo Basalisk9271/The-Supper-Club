@@ -5,6 +5,7 @@ import {
   Sparkles, Trash2, Utensils, X, Check, RefreshCw
 } from 'lucide-react'
 import './styles.css'
+import { copyText } from './clipboard'
 
 const API = import.meta.env.VITE_API_URL || ''
 
@@ -243,6 +244,14 @@ function RecipeModal({preview, onClose, ...actions}) {
 }
 
 function GroceryView({selected,onRemove,updateServings,onOpen,busy,grocery,setGrocery,onBuild,loading}) {
+  const [copyStatus, setCopyStatus] = useState('')
+  const [manualCopy, setManualCopy] = useState('')
+  useEffect(() => { setCopyStatus(''); setManualCopy('') }, [grocery])
+  useEffect(() => {
+    if (copyStatus !== 'copied') return
+    const timer = setTimeout(() => setCopyStatus(''), 4000)
+    return () => clearTimeout(timer)
+  }, [copyStatus])
   const selection = Object.values(selected)
   const checked = grocery.filter(x=>x.checked).length
   const sections = Object.entries(grocery.reduce((groups, item, index) => {
@@ -253,11 +262,21 @@ function GroceryView({selected,onRemove,updateServings,onOpen,busy,grocery,setGr
   const toggleCheck = i => setGrocery(prev => prev.map((x,idx)=>idx===i?{...x,checked:!x.checked}:x))
   const copyList = async () => {
     const text = sections.map(([category, entries]) => `${category}\n${entries.map(({item}) => `${item.checked?'✓':'☐'} ${[item.quantity_display,item.unit,item.name].filter(Boolean).join(' ')}`).join('\n')}`).join('\n\n')
-    await navigator.clipboard.writeText(text)
+    setCopyStatus('copying')
+    setManualCopy('')
+    if (await copyText(text)) {
+      setCopyStatus('copied')
+    } else {
+      setCopyStatus('failed')
+      setManualCopy(text)
+    }
   }
   return <div className="grocery-layout">
     <aside className="plan-panel"><div className="panel-title"><span>Meal Plan</span><b>{selection.length}</b></div>{selection.length ? selection.map(r=><div className="plan-recipe" key={r.id}><div><button className="plan-title" onClick={()=>onOpen(r)}>{r.title}</button><label>Servings <input type="number" min="0.5" step="0.5" key={r.servings} defaultValue={r.servings} disabled={busy} onBlur={e=>{updateServings(r.id,e.target.value); e.target.value=r.servings}}/></label></div><button disabled={busy} aria-label={`Remove ${r.title} from Meal Plan`} onClick={()=>onRemove(r.id)}><Trash2 size={16}/></button></div>) : <p className="muted">Add recipes from Discover or your Cookbook.</p>}<button className="primary wide" disabled={!selection.length||loading} onClick={onBuild}>{loading?<LoaderCircle className="spin" size={17}/>:<RefreshCw size={17}/>}Rebuild list</button></aside>
-    <section className="list-panel"><div className="list-head"><div><span className="eyebrow">SHOPPING MODE</span><h2>Grocery list</h2><p>{grocery.length ? `${checked} of ${grocery.length} items checked` : 'Build a list from your selected recipes.'}</p></div>{grocery.length>0 && <button className="ghost" onClick={copyList}>Copy list</button>}</div>{loading ? <Loading/> : grocery.length ? <div className="grocery-items">{sections.map(([category, entries])=><section className="grocery-section" key={category} aria-label={category}><h3>{category}<span>{entries.length}</span></h3>{entries.map(({item,index})=><button key={`${item.name}-${index}`} className={`grocery-item ${item.checked?'checked':''}`} onClick={()=>toggleCheck(index)}><span className="check">{item.checked&&<Check size={15}/>}</span><span className="qty">{[item.quantity_display,item.unit].filter(Boolean).join(' ')}</span><span className="ingredient">{item.name}{item.notes?.length>0&&<small>{item.notes[0]}</small>}</span><span className="sources">{item.sources.length} recipe{item.sources.length===1?'':'s'}</span></button>)}</section>)}</div> : <Empty icon={<ShoppingBasket/>} title="No grocery list yet" body="Save a recipe to your Grocery List from Discover or your Cookbook."/>}</section>
+    <section className="list-panel"><div className="list-head"><div><span className="eyebrow">SHOPPING MODE</span><h2>Grocery list</h2><p>{grocery.length ? `${checked} of ${grocery.length} items checked` : 'Build a list from your selected recipes.'}</p></div>{grocery.length>0 && <button className="ghost" disabled={copyStatus==='copying'} onClick={copyList}>{copyStatus==='copied'?<><Check size={16}/>Copied!</>:copyStatus==='copying'?'Copying…':'Copy list'}</button>}</div>
+      <div role="status" aria-live="polite" className="copy-status">{copyStatus==='copied'?'Grocery list copied to clipboard.':copyStatus==='failed'?'Automatic copying was blocked. Select and copy the list below.':''}</div>
+      {manualCopy && <div className="manual-copy"><label htmlFor="manual-grocery-copy">Grocery list to copy</label><textarea id="manual-grocery-copy" readOnly value={manualCopy} onFocus={e=>e.target.select()}/><button className="ghost" onClick={()=>{const field=document.getElementById('manual-grocery-copy');field.focus();field.select()}}>Select all</button></div>}
+      {loading ? <Loading/> : grocery.length ? <div className="grocery-items">{sections.map(([category, entries])=><section className="grocery-section" key={category} aria-label={category}><h3>{category}<span>{entries.length}</span></h3>{entries.map(({item,index})=><button key={`${item.name}-${index}`} className={`grocery-item ${item.checked?'checked':''}`} onClick={()=>toggleCheck(index)}><span className="check">{item.checked&&<Check size={15}/>}</span><span className="qty">{[item.quantity_display,item.unit].filter(Boolean).join(' ')}</span><span className="ingredient">{item.name}{item.notes?.length>0&&<small>{item.notes[0]}</small>}</span><span className="sources">{item.sources.length} recipe{item.sources.length===1?'':'s'}</span></button>)}</section>)}</div> : <Empty icon={<ShoppingBasket/>} title="No grocery list yet" body="Save a recipe to your Grocery List from Discover or your Cookbook."/>}</section>
   </div>
 }
 
