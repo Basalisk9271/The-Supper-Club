@@ -15,3 +15,22 @@ button.brand{border:0;background:transparent;color:inherit;padding:0;text-align:
 .search{min-width:0}header nav{min-width:0}header .brand{flex-shrink:0}@media(max-width:760px){header{gap:12px}.toolbar{grid-template-columns:minmax(0,1fr)}}
 
 .copy-status{font-size:13px;color:var(--green);margin-bottom:12px}.copy-status:empty{display:none}.manual-copy{margin:12px 0 20px}.manual-copy label{display:block;font-size:13px;margin-bottom:8px}.manual-copy textarea{width:100%;min-height:180px;background:var(--panel2);color:var(--cream);border:1px solid var(--line);border-radius:10px;padding:12px;font:inherit;font-size:13px;resize:vertical}.manual-copy button{margin-top:8px}
+
+/* Keep ingredient columns tied to usable modal width, including browser zoom. */
+.modal-content{container-type:inline-size}
+.recipe-ingredients{display:grid;grid-template-columns:minmax(0,1fr);column-gap:28px;row-gap:8px;padding-left:20px}
+.modal-content .recipe-ingredients li{margin:0;break-inside:avoid;overflow-wrap:anywhere;padding-right:8px}
+@container(min-width:310px){.recipe-ingredients{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){
+  .modal-content{padding:clamp(14px,4vw,22px);font-size:clamp(.8125rem,3.6vw,.9375rem)}
+  .modal-content h2{font-size:clamp(1.1875rem,5.2vw,1.4375rem);line-height:1.2;margin-bottom:14px;overflow-wrap:anywhere}
+  .modal-content h3{font-size:clamp(.9375rem,4vw,1.0625rem);margin-top:20px}
+  .modal-content li{line-height:1.5;margin:6px 0}
+  .modal-content p{line-height:1.5}
+  .modal-content ol{padding-left:22px}
+  .modal-content .recipe-actions{gap:8px}
+  .modal-content .recipe-actions button{min-height:44px;flex:1 1 140px}
+  .modal-close{min-width:44px;min-height:44px;justify-content:center;margin-left:8px}
+  .modal-image{max-height:220px}
+  .recipe-ingredients{column-gap:22px}
+}

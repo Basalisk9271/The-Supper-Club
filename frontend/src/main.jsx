@@ -235,7 +235,7 @@ function RecipeModal({preview, onClose, ...actions}) {
         <p>{recipe.description}</p>
         <div className="meta">{recipe.servings && <span>{recipe.servings} servings</span>}{recipe.total_minutes && <span>{recipe.total_minutes} minutes</span>}{recipe.cost_text && <span>{recipe.cost_text}</span>}</div>
         <RecipeActions {...actions}/>
-        <h3>Ingredients</h3><ul>{recipe.ingredients?.map((line, i) => <li key={i}>{line}</li>)}</ul>
+        <h3>Ingredients</h3><ul className="recipe-ingredients">{recipe.ingredients?.map((line, i) => <li key={i}>{line}</li>)}</ul>
         <h3>Instructions</h3><ol>{recipe.instructions?.map((line, i) => <li key={i}>{line}</li>)}</ol>
       </>}
       <a href={recipe.source_url || recipe.url} target="_blank" rel="noreferrer">View Original Page <ExternalLink size={14}/></a>
