@@ -12,6 +12,8 @@ from urllib.parse import unquote, urljoin, urlparse
 import httpx
 from bs4 import BeautifulSoup
 
+from .ingredients import strip_ingredient_prices
+
 UA = "TheSupperClub/0.1 (personal recipe organizer; respectful on-demand fetches)"
 TIMEOUT = 20.0
 
@@ -173,6 +175,7 @@ def fetch_recipe(url):
     cost_match = re.search(r"\$\d+(?:\.\d{2})?\s+recipe\s*/\s*\$\d+(?:\.\d{2})?\s+(?:serving|per serving)", body_text, re.I)
     if cost_match:
         result["cost_text"] = cost_match.group(0)
+    result["ingredients"] = [strip_ingredient_prices(line) for line in result["ingredients"]]
     return result
 
 
