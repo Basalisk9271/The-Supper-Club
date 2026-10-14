@@ -4,6 +4,8 @@ import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
 
+from .ingredients import strip_ingredient_prices
+
 # Keep the previous setting and filename as fallbacks for existing installations.
 DB_PATH = os.getenv("SUPPER_CLUB_DB") or os.getenv("PANTRY_DB", str(Path(__file__).resolve().parents[2] / "pantry.db"))
 
@@ -64,7 +66,7 @@ def row_to_recipe(row):
     if not row:
         return None
     item = dict(row)
-    item["ingredients"] = json.loads(item.pop("ingredients_json"))
+    item["ingredients"] = [strip_ingredient_prices(line) for line in json.loads(item.pop("ingredients_json"))]
     item["instructions"] = json.loads(item.pop("instructions_json"))
     item["tags"] = json.loads(item.pop("tags_json"))
     return item

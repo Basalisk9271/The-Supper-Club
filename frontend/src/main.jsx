@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react'
 import { createRoot } from 'react-dom/client'
 import {
   BookOpen, ExternalLink, LoaderCircle, Plus, Search, ShoppingBasket,
-  Sparkles, Trash2, Utensils, X, Check, RefreshCw
+  Sparkles, Trash2, Utensils, X, Check, RefreshCw, Download
 } from 'lucide-react'
 import './styles.css'
 import { copyText } from './clipboard'
@@ -253,6 +253,40 @@ function GroceryView({selected,onRemove,updateServings,onOpen,busy,grocery,setGr
     return () => clearTimeout(timer)
   }, [copyStatus])
   const selection = Object.values(selected)
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState('')
+  const downloadPdf = async () => {
+    if (exporting) return
+    setExporting(true)
+    setExportError('')
+    try {
+      const response = await fetch(`${API}/api/meal-plan/pdf`, {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          recipes: selection.map(r => ({id: r.id, servings: Number(r.servings)})),
+          checked_items: grocery.filter(item => item.checked).map(({name, unit}) => ({name, unit})),
+        }),
+      })
+      if (!response.ok) {
+        let message = `PDF export failed (${response.status})`
+        try { const data = await response.json(); if (typeof data.detail === 'string') message = data.detail } catch {}
+        throw new Error(message)
+      }
+      const url = URL.createObjectURL(await response.blob())
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'supper-club-grocery-and-recipes.pdf'
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 60000)
+    } catch (error) {
+      setExportError(error.message || 'Could not download PDF. Please try again.')
+    } finally {
+      setExporting(false)
+    }
+  }
+
   const checked = grocery.filter(x=>x.checked).length
   const sections = Object.entries(grocery.reduce((groups, item, index) => {
     const category = item.category || 'Other'
@@ -273,7 +307,8 @@ function GroceryView({selected,onRemove,updateServings,onOpen,busy,grocery,setGr
   }
   return <div className="grocery-layout">
     <aside className="plan-panel"><div className="panel-title"><span>Meal Plan</span><b>{selection.length}</b></div>{selection.length ? selection.map(r=><div className="plan-recipe" key={r.id}><div><button className="plan-title" onClick={()=>onOpen(r)}>{r.title}</button><label>Servings <input type="number" min="0.5" step="0.5" key={r.servings} defaultValue={r.servings} disabled={busy} onBlur={e=>{updateServings(r.id,e.target.value); e.target.value=r.servings}}/></label></div><button disabled={busy} aria-label={`Remove ${r.title} from Meal Plan`} onClick={()=>onRemove(r.id)}><Trash2 size={16}/></button></div>) : <p className="muted">Add recipes from Discover or your Cookbook.</p>}<button className="primary wide" disabled={!selection.length||loading} onClick={onBuild}>{loading?<LoaderCircle className="spin" size={17}/>:<RefreshCw size={17}/>}Rebuild list</button></aside>
-    <section className="list-panel"><div className="list-head"><div><span className="eyebrow">SHOPPING MODE</span><h2>Grocery list</h2><p>{grocery.length ? `${checked} of ${grocery.length} items checked` : 'Build a list from your selected recipes.'}</p></div>{grocery.length>0 && <button className="ghost" disabled={copyStatus==='copying'} onClick={copyList}>{copyStatus==='copied'?<><Check size={16}/>Copied!</>:copyStatus==='copying'?'Copying…':'Copy list'}</button>}</div>
+    <section className="list-panel"><div className="list-head"><div><span className="eyebrow">SHOPPING MODE</span><h2>Grocery list</h2><p>{grocery.length ? `${checked} of ${grocery.length} items checked` : 'Build a list from your selected recipes.'}</p></div><div className="list-actions"><button className="ghost" disabled={!selection.length || loading || busy || exporting} onClick={downloadPdf}>{exporting?<LoaderCircle className="spin" size={16}/>:<Download size={16}/>} {exporting?'Preparing PDF…':'Download PDF'}</button>{grocery.length>0 && <button className="ghost" disabled={copyStatus==='copying'} onClick={copyList}>{copyStatus==='copied'?<><Check size={16}/>Copied!</>:copyStatus==='copying'?'Copying…':'Copy list'}</button>}</div></div>
+      {exportError && <p role="alert">{exportError}</p>}
       <div role="status" aria-live="polite" className="copy-status">{copyStatus==='copied'?'Grocery list copied to clipboard.':copyStatus==='failed'?'Automatic copying was blocked. Select and copy the list below.':''}</div>
       {manualCopy && <div className="manual-copy"><label htmlFor="manual-grocery-copy">Grocery list to copy</label><textarea id="manual-grocery-copy" readOnly value={manualCopy} onFocus={e=>e.target.select()}/><button className="ghost" onClick={()=>{const field=document.getElementById('manual-grocery-copy');field.focus();field.select()}}>Select all</button></div>}
       {loading ? <Loading/> : grocery.length ? <div className="grocery-items">{sections.map(([category, entries])=><section className="grocery-section" key={category} aria-label={category}><h3>{category}<span>{entries.length}</span></h3>{entries.map(({item,index})=><button key={`${item.name}-${index}`} className={`grocery-item ${item.checked?'checked':''}`} onClick={()=>toggleCheck(index)}><span className="check">{item.checked&&<Check size={15}/>}</span><span className="qty">{[item.quantity_display,item.unit].filter(Boolean).join(' ')}</span><span className="ingredient">{item.name}{item.notes?.length>0&&<small>{item.notes[0]}</small>}</span><span className="sources">{item.sources.length} recipe{item.sources.length===1?'':'s'}</span></button>)}</section>)}</div> : <Empty icon={<ShoppingBasket/>} title="No grocery list yet" body="Save a recipe to your Grocery List from Discover or your Cookbook."/>}</section>

@@ -79,17 +79,25 @@ Grocery sections are inferred from ingredient names, with unrecognized items und
 
 Pasta and dairy weights in pounds convert to ounces before combining amounts (1 lb = 16 oz). Cups, tablespoons, grams, and other units remain as supplied. The app does not convert volume into weight or infer how many retail packages to buy. Quantities currently display calculated amounts rounded to two decimal places; fraction display, shopping round-up, and an extra-quantity buffer are not implemented.
 
+## Printable meal plan
+
+On the Grocery list tab, select **Download PDF** to download one printable, US Letter PDF. It starts with a three-column categorized grocery checklist, logo letterhead, and checked-item key, then includes each planned recipe on a new page with two-column ingredients scaled to planned servings, instructions, timings, and its original source URL. Long lists and recipes continue across pages automatically. Page numbering restarts at 1 for each recipe. Pages use half-inch outer margins with extra space reserved beneath the content for the aligned recipe footer. Recipe descriptions appear in a warm bordered box, with matching accent headings. Each recipe footer lists the recipe name followed by its clickable source link on a second line; the source link is omitted from the recipe body.
+
+Quantities embedded in recipe instructions remain as written by the author; the PDF flags this when servings change. Ingredients with no recognizable quantity remain unchanged. If the original recipe yield is unknown, recipe ingredient quantities remain unchanged.
+
+Rebuild both Docker services after updating to install the PDF dependency and display the button: `docker compose up -d --build`.
+
 ## Project structure
 
 - `frontend/`: React, Vite, Lucide icons, responsive dark-theme styles.
 - `backend/app/`: FastAPI routes, SQLite storage, recipe discovery/import, grocery grouping.
 - `backend/tests/`: Regression tests for discovery, search, Cookbook/Meal Plan independence, and grocery quantities.
 - `docker-compose.yml`: API and Nginx frontend services with persistent SQLite storage.
-- `pantry-pilot/`: Existing mirrored application directory, retained for compatibility. Use the root project for the commands above; application changes are mirrored in both copies.
+- `docker-compose.yml`: Builds the root backend and frontend. Run project commands from the repository root; nested application mirrors have been removed.
 
 ## Validation
 
-With backend dependencies installed, run from the repository root:
+Install test dependencies with `python -m pip install -r backend/tests/requirements.txt`, then run from the repository root:
 
 ```bash
 PYTHONPATH=backend python -m unittest discover -s backend/tests -v
