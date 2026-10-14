@@ -1,3 +1,5 @@
+from .ingredients import strip_ingredient_prices
+
 import re
 from collections import defaultdict
 from fractions import Fraction
@@ -21,23 +23,100 @@ GROCERY_CATEGORIES = (
 )
 CATEGORY_RULES = (
     ("Frozen", r"frozen|ice cream"),
-    ("Pantry", r"broth|stock|bouillon|canned|cans?|tomato (?:paste|sauce)|coconut (?:milk|cream)|(?:almond|oat|soy) milk|(?:peanut|almond|cashew|sunflower) butter|apple ?sauce|juice|oil|vinegar|sauce|paste|ketchup|mustard|mayonnaise|mayo|dressing|salsa|syrup|honey|sugar|flour|baking (?:powder|soda)|cornstarch|cocoa|chocolate|vanilla|yeast|beans?|lentils?|chickpeas?|chick peas|peas|nuts?|walnuts?|almonds?|peanuts?|pecans?|cashews?|seeds?|raisins?|tofu|tempeh"),
-    ("Herbs & Spices", r"(?:garlic|onion|chili|chilli|curry) powder|(?:black|white|cayenne|ground|crushed red) pepper|pepper flakes|peppercorns?|salt|paprika|cumin|cinnamon|nutmeg|turmeric|seasoning|dried (?:basil|oregano|thyme|rosemary|parsley|dill)|oregano|bay leaves|cloves|allspice|cardamom|coriander"),
+    ("Pantry", r"broth|stock|bouillon|canned|cans?|tomato (?:paste|sauce)|coconut (?:milk|cream)|(?:almond|oat|soy) milk|(?:peanut|almond|cashew|sunflower) butter|apple ?sauce|juice|oil|vinegar|sauce|paste|ketchup|(?<!dry )(?<!ground )mustard(?! (?:powder|seeds?))|mayonnaise|mayo|dressing|salsa|syrup|honey|sugar|flour|baking (?:powder|soda)|cornstarch|cocoa|chocolate|vanilla|yeast|beans?|lentils?|chickpeas?|chick peas|peas|nuts?|walnuts?|almonds?|peanuts?|pecans?|cashews?|(?:chia|pumpkin|sunflower|flax|hemp) seeds?|raisins?|tofu|tempeh"),
+    ("Herbs & Spices", r"(?:garlic|onion|chili|chilli|curry) powder|(?:black|white|cayenne|ground|cracked|crushed red) pepper|pepper flakes|peppercorns?|salt|paprika|cumin|cinnamon|nutmeg|turmeric|seasoning|dried (?:basil|oregano|thyme|rosemary|parsley|dill)|oregano|bay leaves|cloves|allspice|cardamom|coriander"),
     ("Dairy & Eggs", r"milk|cream|butter|cheese|cheddar|parmesan|mozzarella|feta|ricotta|yogurt|yoghurt|eggs?|buttermilk|ghee|half.and.half"),
     ("Meat & Seafood", r"chicken|beef|pork|turkey|lamb|veal|duck|bacon|sausage|ham|steak|ground meat|salmon|tuna|shrimp|prawns?|fish|cod|tilapia|crab|lobster|scallops?|mussels?|clams?|anchovies|sardines"),
     ("Bakery & Grains", r"bread|breadcrumbs|panko|tortillas?|rolls?|buns?|bagels?|pita|rice|pasta|noodles?|spaghetti|macaroni|penne|orzo|fettuccine|linguine|lasagna|couscous|quinoa|oats?|oatmeal|barley|farro|bulgur"),
     ("Vegetables", r"onions?|shallots?|scallions?|garlic|tomato(?:es)?|potato(?:es)?|carrots?|celery|broccoli|cauliflower|spinach|kale|lettuce|cabbage|peppers?|zucchini|squash|cucumbers?|mushrooms?|asparagus|eggplants?|aubergines?|corn|green beans|green peas|snap peas|snow peas|beets?|radishes|leeks?|brussels sprouts|arugula|jalapeños?|jalapenos?|chiles?|chilies|ginger|cilantro|parsley|basil|thyme|rosemary|dill|mint"),
     ("Fruit", r"apples?|bananas?|oranges?|lemons?|limes?|avocados?|strawberr(?:y|ies)|blueberr(?:y|ies)|raspberr(?:y|ies)|berr(?:y|ies)|grapes?|pineapples?|mango(?:es)?|peach(?:es)?|pears?|melons?|watermelons?|cherries|coconut"),
 )
-CATEGORY_PATTERNS = [(category, re.compile(r"\b(?:" + pattern + r")\b", re.I))
-                     for category, pattern in CATEGORY_RULES]
+# Additional names and regional spellings, grouped by shopping section.
+EXTRA_CATEGORY_TERMS = {
+    "Frozen": r"hash browns?|tater tots?|sorbet|sherbet",
+    "Pantry": (
+        r"tamari|miso|tahini|harissa|gochujang|sriracha|hoisin|molasses|agave|"
+        r"preserves?|jams?|jell(?:y|ies)|marmalade|olives?|capers?|pickles?|"
+        r"chickpeas?|garbanzo|edamame|seitan|textured vegetable protein|"
+        r"cashews?|pistachios?|hazelnuts?|macadamias?|pine nuts|"
+        r"dried (?:fruit|cranberries|apricots|dates|figs)|currants|prunes|"
+        r"corn ?starch|arrowroot|gelatin|agar|baking chocolate|cacao|"
+        r"crackers?|pretzels?|tortilla chips|cooking spray|"
+        r"(?:almond|oat|soy|soya|rice|cashew|hemp|pea)[ -]milk|"
+        r"(?:almond|cashew|apple|pumpkin|sunflower)[ -]butter|"
+        r"nutritional yeast|sparkling water|seltzer|club soda|wine|beer"
+    ),
+    "Herbs & Spices": (
+        r"cayenne|chilli|chili powder|curry powder|mustard powder|dry mustard|"
+        r"(?:ground|dried|powdered|granulated) (?:ginger|garlic|onion|basil|thyme|rosemary|"
+        r"parsley|dill|mint|sage|chives|tarragon|marjoram|fennel)|"
+        r"(?:ginger|mustard|cayenne|fennel) powder|"
+        r"bay leaf|sage|marjoram|tarragon|saffron|sumac|fenugreek|anise|"
+        r"caraway|celery seed|mustard seeds?|fennel seeds?|poppy seeds?|sesame seeds?|"
+        r"garam masala|five[ -]spice|za[’']?atar|ras el hanout|"
+        r"italian herbs|herbes de provence|old bay|adobo seasoning|cajun seasoning|creole seasoning|"
+        r"red pepper flakes|chile powder|chipotle powder|smoked paprika"
+    ),
+    "Dairy & Eggs": (
+        r"kefir|skyr|creme fraiche|crème fraîche|mascarpone|burrata|"
+        r"paneer|halloumi|gruy[eè]re|gouda|brie|camembert|manchego|"
+        r"provolone|monterey jack|colby|pecorino|romano|queso fresco|"
+        r"egg whites?|egg yolks?|half[ -]and[ -]half"
+    ),
+    "Meat & Seafood": (
+        r"tenderloins?|sirloin|ribeye|brisket|chuck roast|short ribs?|"
+        r"spareribs?|pork chops?|drumsticks?|rotisserie chicken|cornish hens?|"
+        r"bison|venison|rabbit|goose|geese|prosciutto|pancetta|chorizo|"
+        r"pepperoni|salami|andouille|kielbasa|bratwurst|hot dogs?|"
+        r"haddock|halibut|trout|catfish|mahi[ -]mahi|swordfish|snapper|"
+        r"pollock|herring|mackerel|sole|squid|calamari|octopus|crawfish|crayfish"
+    ),
+    "Bakery & Grains": (
+        r"rigatoni|rotini|fusilli|farfalle|ravioli|tortellini|ziti|"
+        r"vermicelli|angel hair|lasagne|gnocchi|udon|soba|ramen|"
+        r"polenta|grits|millet|buckwheat|amaranth|semolina|"
+        r"sourdough|ciabatta|baguettes?|brioche|naan|flatbreads?|"
+        r"croissants?|english muffins?|matzo|matzah|lavash|"
+        r"pizza dough|puff pastry|phyllo|filo|pie crust|wonton wrappers?"
+    ),
+    "Vegetables": (
+        r"bok choy|pak choi|chard|collard greens|mustard greens|"
+        r"watercress|endive|escarole|radicchio|romaine|fennel|"
+        r"artichokes?|okra|turnips?|parsnips?|rutabagas?|swede|"
+        r"sweet potatoes|yams?|celeriac|jicama|daikon|bamboo shoots|"
+        r"water chestnuts|bean sprouts|alfalfa sprouts|hearts of palm|"
+        r"sugar snap peas|mangetout|sugar peas|haricots verts|"
+        r"serrano|poblano|habanero|anaheim|chillies|chili peppers?|"
+        r"tomatillos?|chives|lemongrass|galangal|fresh oregano|fresh sage|fresh tarragon"
+    ),
+    "Fruit": (
+        r"cranberr(?:y|ies)|blackberr(?:y|ies)|kiwi(?:fruit)?|"
+        r"grapefruits?|tangerines?|mandarins?|clementines?|"
+        r"nectarines?|apricots?|plums?|pomegranates?|papayas?|"
+        r"passion fruit|dragon fruit|lychees?|guavas?|persimmons?|"
+        r"cantaloupe|honeydew|fresh dates|fresh figs"
+    ),
+}
+CATEGORY_PATTERNS = [
+    (category, re.compile(r"\b(?:" + pattern + "|" + EXTRA_CATEGORY_TERMS[category] + r")\b", re.I))
+    for category, pattern in CATEGORY_RULES
+]
 
 
 def ingredient_category(name):
-    # Ignore preparation notes, which can mention unrelated ingredients.
+    # Commas between leading descriptors are part of the ingredient name:
+    # "boneless, skinless chicken breasts" must not become just "boneless".
+    name = re.sub(
+        r"^(?:(?:boneless|skinless|bone-in|skin-on|fresh|raw|cooked|lean|"
+        r"large|small|medium|organic)(?:\s*,\s*|\s+))+",
+        lambda match: match.group().replace(",", " "), name, flags=re.I,
+    )
+    # Preserve a parenthesized cut description before the ingredient too.
+    name = re.sub(r"^\((?:boneless|skinless|boneless[ ,]+skinless)\)\s*", "", name, flags=re.I)
+    # Ignore trailing preparation notes, which can mention unrelated ingredients.
     name = re.split(r",|\(", name, maxsplit=1)[0]
-    # Fresh green beans and peas belong with produce, unlike dried legumes.
-    if re.search(r"\b(?:green beans|green peas|snap peas|snow peas)\b", name, re.I) and not re.search(r"\b(?:frozen|canned|can)\b", name, re.I):
+    # Fresh herbs and fresh green legumes belong with produce.
+    if re.search(r"\b(?:fresh (?:oregano|sage|tarragon)|green beans|green peas|snap peas|snow peas|sugar peas|mangetout|haricots verts)\b", name, re.I) and not re.search(r"\b(?:frozen|canned|can|dried)\b", name, re.I):
         return "Vegetables"
     for category, pattern in CATEGORY_PATTERNS:
         if pattern.search(name):
@@ -63,8 +142,49 @@ def _number(token):
         return None
 
 
+# Remove preparation wording, while preserving product-defining descriptors
+# such as dried, smoked, ground (beef/spices), and unsalted.
+PREPARATION_WORDS = re.compile(
+    r"\b(?:(?:finely|roughly|coarsely|freshly)\s+)?"
+    r"(?:chopped|diced|minced|sliced|grated|shredded|peeled|"
+    r"softened|melted|divided|optional)\b|\bto taste\b", re.I,
+)
+INGREDIENT_ALIASES = {
+    "pepper": "black pepper", "ground pepper": "black pepper",
+    "cracked pepper": "black pepper", "ground black pepper": "black pepper",
+    "cracked black pepper": "black pepper", "black pepper ground": "black pepper",
+    "black pepper cracked": "black pepper",
+    "onions": "onion", "carrots": "carrot", "potatoes": "potato",
+    "tomatoes": "tomato", "lemons": "lemon", "limes": "lime",
+    "garlic cloves": "garlic", "garlic clove": "garlic",
+}
+UNIT_ALIASES = {
+    "cups": "cup", "cloves": "clove", "cans": "can",
+    "packages": "package",
+}
+
+
+def ingredient_key(name):
+    """Normalize shopping identity with conservative, extensible rules."""
+    # Retain comma-separated leading descriptors (boneless, skinless chicken).
+    name = re.sub(
+        r"^(?:(?:boneless|skinless|bone-in|skin-on)(?:\s*,\s*|\s+))+",
+        lambda match: match.group().replace(",", " "), name, flags=re.I,
+    )
+    name = re.split(r",|\(", name, maxsplit=1)[0].lower()
+    name = PREPARATION_WORDS.sub(" ", name)
+    name = re.sub(r"\bfreshly\s+(?=(?:ground|cracked)\b)", "", name)
+    name = re.sub(r"\s+", " ", name).strip(" ,-")
+    return INGREDIENT_ALIASES.get(name, name)
+
+
 def parse_ingredient(line):
-    clean = re.sub(r"\([^)]*\$[^)]*\)", "", line).strip()
+    line = strip_ingredient_prices(line)
+    clean = line
+    clean = re.sub(
+        r"(?<=[\d" + "".join(UNICODE_FRACTIONS) + r"])(?=(?:" + "|".join(sorted(UNITS, key=len, reverse=True)) + r")\b)",
+        " ", clean, flags=re.I,
+    )
     clean = re.sub(r"\s+", " ", clean)
     parts = clean.split()
     qty = None
@@ -85,8 +205,7 @@ def parse_ingredient(line):
         used += 1
     name = " ".join(parts[used:]).strip(" ,") or clean
     # Remove preparation notes for grouping, but keep original in output notes.
-    key = re.split(r",|\(|\b(?:divided|chopped|diced|minced|sliced|optional|to taste)\b", name, maxsplit=1, flags=re.I)[0]
-    key = re.sub(r"\s+", " ", key).strip().lower()
+    key = ingredient_key(name)
     return {"quantity": qty, "unit": unit, "name": name, "key": key, "original": line}
 
 
@@ -101,7 +220,7 @@ PASTA_NAMES = re.compile(
 
 def shopping_weight(ingredient):
     """Use package-friendly weight units before merging grocery amounts."""
-    unit = ingredient["unit"]
+    unit = UNIT_ALIASES.get(ingredient["unit"], ingredient["unit"])
     quantity = ingredient["quantity"]
     if unit in OUNCE_UNITS:
         unit = "oz"
@@ -116,6 +235,16 @@ def shopping_weight(ingredient):
     return {**ingredient, "quantity": quantity, "unit": unit}
 
 
+def is_plain_water(name):
+    """Temperature and cooking notes do not make water a shopping item."""
+    return bool(re.fullmatch(
+        r"(?:(?:plain|tap|hot|warm|cold|cool|boiling|lukewarm|room[ -]temperature)\s+)*water"
+        r"(?:\s*(?:,|\()\s*(?:divided|as needed|for boiling|for cooking|hot|warm|cold|boiling|room temperature)\s*\)?)*"
+        r"(?:\s+(?:as needed|for boiling|for cooking))?",
+        name.strip(), re.I,
+    ))
+
+
 def build_grocery_list(recipes, selections):
     grouped = defaultdict(lambda: {"quantity": 0.0, "unit": None, "name": None, "sources": [], "unmerged": []})
     for recipe in recipes:
@@ -125,9 +254,14 @@ def build_grocery_list(recipes, selections):
         multiplier = target_servings / base_servings if base_servings else 1
         for line in recipe.get("ingredients", []):
             parsed = shopping_weight(parse_ingredient(line))
+            if is_plain_water(parsed["name"]):
+                continue
+            # Preserve water types written in notes, e.g. "water (distilled)".
+            if parsed["key"] == "water":
+                parsed["key"] = parsed["name"].lower()
             group_key = f"{parsed['key']}|{parsed['unit'] or ''}"
             item = grouped[group_key]
-            item["name"] = parsed["name"]
+            item["name"] = parsed["key"]
             item["unit"] = parsed["unit"]
             item["sources"].append(recipe["title"])
             if parsed["quantity"] is None:
