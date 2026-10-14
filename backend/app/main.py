@@ -3,11 +3,13 @@ from typing import Dict, List
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from pydantic import BaseModel, HttpUrl, Field
 
 from .db import (get_recipes, init_db, list_recipes, upsert_recipe, get_recipe_by_url,
                  get_meal_plan, save_meal_plan_recipe, remove_meal_plan_recipe, remove_from_cookbook)
 from .grocery import build_grocery_list
+from .pdf_export import build_meal_plan_pdf
 from .scraper import CATEGORY_URLS, browse_budget_bytes, fetch_recipe, search_budget_bytes
 
 app = FastAPI(title="The Supper Club API", description="Discover recipes, save a personal Cookbook, plan meals, and build a grocery list.", version="0.1.0")
@@ -26,6 +28,15 @@ class GrocerySelection(BaseModel):
 
 class GroceryBody(BaseModel):
     recipes: List[GrocerySelection]
+
+
+class CheckedGroceryItem(BaseModel):
+    name: str
+    unit: str | None = None
+
+
+class PdfExportBody(GroceryBody):
+    checked_items: List[CheckedGroceryItem] = Field(default_factory=list)
 
 
 @app.on_event("startup")
@@ -126,3 +137,20 @@ def delete_meal_plan(recipe_id: int):
 def delete_cookbook_recipe(recipe_id: int):
     remove_from_cookbook(recipe_id)
     return {"ok": True}
+
+
+@app.post("/api/meal-plan/pdf")
+def export_meal_plan(body: PdfExportBody):
+    ids = [selection.id for selection in body.recipes]
+    if not ids or len(ids) != len(set(ids)):
+        raise HTTPException(422, "Select at least one meal, with no duplicates")
+    by_id = {recipe["id"]: recipe for recipe in get_recipes(ids)}
+    if any(recipe_id not in by_id for recipe_id in ids):
+        raise HTTPException(404, "A selected recipe no longer exists. Refresh your meal plan.")
+    selections = {str(selection.id): {"servings": selection.servings} for selection in body.recipes}
+    pdf = build_meal_plan_pdf([by_id[recipe_id] for recipe_id in ids], selections,
+                              [(item.name, item.unit or "") for item in body.checked_items])
+    return Response(pdf, media_type="application/pdf", headers={
+        "Content-Disposition": 'attachment; filename="supper-club-grocery-and-recipes.pdf"',
+        "Cache-Control": "no-store",
+    })
