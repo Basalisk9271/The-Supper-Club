@@ -4,7 +4,7 @@ Good food. Shared plans. The Supper Club is a local-first app for discovering re
 
 ## What you can do
 
-- **Discover:** Browse Budget Bytes categories or search recipe names across its public catalog. Submit searches with **Search** or **Enter**. Searches span all categories; Cookbook search only filters your saved recipes.
+- **Discover:** Start with New & Noteworthy, showing recipes from Budget Bytes’ [Newest Recipes section](https://www.budgetbytes.com/category/recipes/#recent) in source order, or browse Budget Bytes categories or search recipe names across its public catalog. Submit searches with **Search** or **Enter**. Searches span all categories; Cookbook search only filters your saved recipes.
 - **Browse 30 recipes per page:** Pages fill with up to 30 verified recipes where available. Wide screens show up to five cards per row; phones show one. Collections and account links are excluded.
 - **Preview recipes:** Open a card or paste a recipe URL to view ingredients and instructions in a modal. Close it with X or Escape. Ingredients use two columns when space allows.
 - **Import from other sites:** Paste a public recipe URL. Import requires structured Recipe data with ingredients; compatibility depends on the source website. Automatic discovery currently supports Budget Bytes only.
@@ -93,7 +93,7 @@ Rebuild both Docker services after updating to install the PDF dependency and di
 - `backend/app/`: FastAPI routes, SQLite storage, recipe discovery/import, grocery grouping.
 - `backend/tests/`: Regression tests for discovery, search, Cookbook/Meal Plan independence, and grocery quantities.
 - `docker-compose.yml`: API and Nginx frontend services with persistent SQLite storage.
-- `pantry-pilot/`: Existing mirrored application directory, retained for compatibility. Use the root project for the commands above; application changes are mirrored in both copies.
+- `docker-compose.yml`: Builds the root backend and frontend. Run project commands from the repository root; nested application mirrors have been removed.
 
 ## Validation
 

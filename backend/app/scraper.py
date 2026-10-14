@@ -18,6 +18,8 @@ UA = "TheSupperClub/0.1 (personal recipe organizer; respectful on-demand fetches
 TIMEOUT = 20.0
 
 CATEGORY_URLS = {
+    # Use the Newest Recipes listing below the featured recipe groups.
+    "New & Noteworthy": "https://www.budgetbytes.com/category/recipes/#recent",
     "Popular": "https://www.budgetbytes.com/category/recipes/",
     "Quick": "https://www.budgetbytes.com/category/recipes/quick/",
     "One Pot": "https://www.budgetbytes.com/category/recipes/one-pot/",
@@ -195,8 +197,13 @@ def _browse_category_page(url, day):
     host = "www.budgetbytes.com"
     results, seen = [], set()
 
+    # The Recent anchor precedes the archive listing; featured groups elsewhere
+    # on the page must not enter New & Noteworthy, including on later pages.
+    listing = soup.select_one(".archive-post-listing") if urlparse(url).fragment == "recent" else soup
+    if listing is None:
+        raise ValueError("Budget Bytes Recent recipe listing is unavailable. Please try again.")
     # Only consider post cards, never navigation, account or newsletter links.
-    for card in soup.select("article.post-summary"):
+    for card in listing.select("article.post-summary"):
         title = card.select_one(".post-summary__title")
         a = title.find_parent("a", href=True) if title else None
         if a is None and title is not None:
@@ -243,11 +250,13 @@ def _browse_category_page(url, day):
     next_url = urljoin(str(r.url), next_link.get("href", "")) if next_link else None
     if next_url and (urlparse(next_url).hostname != host or urlparse(next_url).scheme != "https"):
         next_url = None
+    if next_url and urlparse(url).fragment == "recent":
+        next_url = urlparse(next_url)._replace(fragment="recent").geturl()
     return results, next_url
 
 
-def browse_budget_bytes(category="Popular", page=1):
-    base = CATEGORY_URLS.get(category, CATEGORY_URLS["Popular"])
+def browse_budget_bytes(category="New & Noteworthy", page=1):
+    base = CATEGORY_URLS.get(category, CATEGORY_URLS["New & Noteworthy"])
     url = base
     results, seen, visited = [], set(), set()
     end = page * SEARCH_PAGE_SIZE

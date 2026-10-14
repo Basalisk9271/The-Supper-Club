@@ -30,7 +30,7 @@ function Toast({ message, onClose }) {
 function App() {
   const [tab, setTab] = useState('discover')
   const [categories, setCategories] = useState([])
-  const [category, setCategory] = useState('Popular')
+  const [category, setCategory] = useState('New & Noteworthy')
   const [discover, setDiscover] = useState([])
   const [discoverPage, setDiscoverPage] = useState(1)
   const [library, setLibrary] = useState([])
@@ -108,7 +108,7 @@ function App() {
   const clearDiscoverSearch = () => {setDiscoverInput('');setDiscoverQuery('');setDiscoverPage(1)}
 
   useEffect(() => {
-    api('/api/categories').then(setCategories).catch(() => setCategories(['Popular','Quick','One Pot','Chicken','Vegetarian']))
+    api('/api/categories').then(setCategories).catch(() => setCategories(['New & Noteworthy','Popular','Quick','One Pot','Chicken','Vegetarian']))
     api('/api/meal-plan').then(applyPlan).catch(e => setToast(e.message))
     loadLibrary().catch(e => setToast(e.message))
   }, [])
