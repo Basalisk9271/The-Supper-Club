@@ -81,7 +81,7 @@ Pasta and dairy weights in pounds convert to ounces before combining amounts (1 
 
 ## Printable meal plan
 
-On the Grocery list tab, select **Download PDF** to download one printable, US Letter PDF. It starts with the categorized grocery checklist and preserves current checkmarks, then includes each planned recipe on a new page with ingredients scaled to planned servings, instructions, timings, and its original source URL. Long lists and recipes continue across pages automatically.
+On the Grocery list tab, select **Download PDF** to download one printable, US Letter PDF. It starts with a three-column categorized grocery checklist, logo letterhead, and checked-item key, then includes each planned recipe on a new page with two-column ingredients scaled to planned servings, instructions, timings, and its original source URL. Long lists and recipes continue across pages automatically. Page numbering restarts at 1 for each recipe. Pages use half-inch outer margins with extra space reserved beneath the content for the aligned recipe footer. Recipe descriptions appear in a warm bordered box, with matching accent headings. Each recipe footer lists the recipe name followed by its clickable source link on a second line; the source link is omitted from the recipe body.
 
 Quantities embedded in recipe instructions remain as written by the author; the PDF flags this when servings change. Ingredients with no recognizable quantity remain unchanged. If the original recipe yield is unknown, recipe ingredient quantities remain unchanged.
 
