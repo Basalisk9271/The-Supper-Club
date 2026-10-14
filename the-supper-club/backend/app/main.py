@@ -44,7 +44,7 @@ def categories():
 
 
 @app.get("/api/discover")
-def discover(category: str = "Popular", page: int = Query(1, ge=1, le=200), q: str = Query("", max_length=120)):
+def discover(category: str = "New & Noteworthy", page: int = Query(1, ge=1, le=200), q: str = Query("", max_length=120)):
     try:
         if q.strip():
             return search_budget_bytes(q, page)
