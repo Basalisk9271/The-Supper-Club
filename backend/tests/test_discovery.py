@@ -22,7 +22,7 @@ class DiscoveryTests(unittest.TestCase):
         client = httpx.Client(transport=httpx.MockTransport(
             lambda request: httpx.Response(200, text=html, request=request)))
         with patch.object(scraper, '_client', return_value=client):
-            return scraper.browse_budget_bytes()['items']
+            return scraper.browse_budget_bytes('Popular')['items']
 
     def test_only_recipe_cards_and_no_duplicates(self):
         html = '<a href="/sign-in/">Sign in</a><a href="/sign-up/">Sign up</a>'
@@ -54,13 +54,41 @@ class DiscoveryTests(unittest.TestCase):
         second = ''.join(card(f'recipe-{i}/', f'Recipe {i}', '$2 recipe') for i in range(15, 45))
         client = httpx.Client(transport=httpx.MockTransport(lambda request: httpx.Response(200, text=second if '/page/2/' in request.url.path else first)))
         with patch.object(scraper, '_client', side_effect=lambda: httpx.Client(transport=client._transport)):
-            one = scraper.browse_budget_bytes()
-            two = scraper.browse_budget_bytes(page=2)
+            one = scraper.browse_budget_bytes("Popular")
+            two = scraper.browse_budget_bytes("Popular", page=2)
         self.assertEqual(len(one['items']), 30)
         self.assertTrue(one['has_more'])
         self.assertEqual(len(two['items']), 15)
         self.assertFalse(two['has_more'])
         self.assertFalse({x['url'] for x in one['items']} & {x['url'] for x in two['items']})
+
+    def test_default_uses_only_recent_listing_across_pagination(self):
+        requests = []
+        first = card('featured/', 'Featured recipe', '$2 recipe')
+        first += '<header id="recent">Newest Recipes</header><div class="archive-post-listing">'
+        first += card('new/', 'New recipe', '$2 recipe') + '</div>'
+        first += '<a rel="next" href="/category/recipes/page/2/">Next</a>'
+        second = card('featured/', 'Featured recipe', '$2 recipe')
+        second += '<div class="archive-post-listing">' + card('older/', 'Older recipe', '$2 recipe') + '</div>'
+        def respond(request):
+            requests.append(str(request.url))
+            return httpx.Response(200, text=second if '/page/2/' in request.url.path else first)
+        with patch.object(scraper, '_client', side_effect=lambda: httpx.Client(transport=httpx.MockTransport(respond))):
+            result = scraper.browse_budget_bytes()
+        self.assertEqual(result['category'], 'New & Noteworthy')
+        self.assertEqual(result['source_url'], scraper.CATEGORY_URLS['New & Noteworthy'])
+        self.assertEqual([item['title'] for item in result['items']], ['New recipe', 'Older recipe'])
+        self.assertEqual(requests, [
+            'https://www.budgetbytes.com/category/recipes/#recent',
+            'https://www.budgetbytes.com/category/recipes/page/2/#recent',
+        ])
+
+    def test_missing_recent_listing_does_not_fall_back_to_featured(self):
+        client = httpx.Client(transport=httpx.MockTransport(lambda request: httpx.Response(
+            200, text=card('featured/', 'Featured recipe', '$2 recipe'))))
+        with patch.object(scraper, '_client', return_value=client):
+            with self.assertRaisesRegex(ValueError, 'Recent recipe listing'):
+                scraper.browse_budget_bytes()
 
     def test_schema_validation_and_cache(self):
         scraper._is_recipe_page.cache_clear()

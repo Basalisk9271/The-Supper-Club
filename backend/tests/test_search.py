@@ -75,3 +75,6 @@ class SearchTests(unittest.TestCase):
             browse.assert_not_called()
             client.get('/api/discover?q=%20&category=Quick')
             browse.assert_called_once_with('Quick', 1)
+            browse.reset_mock()
+            client.get('/api/discover')
+            browse.assert_called_once_with('New & Noteworthy', 1)
